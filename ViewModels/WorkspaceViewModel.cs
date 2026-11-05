@@ -31,8 +31,12 @@ public partial class VideoTileViewModel(string identity, Action<RemoteInput>? se
     public string MediaLabel => (MicrophoneOn ? "Microphone on" : "Muted") + " · " + Quality;
     public ICommand InputCommand { get; } = new RelayCommand<RemoteInput>(value => { if (value != null) sendInput?.Invoke(value); });
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasFrame))] private VideoPicture? _frame;
-    [ObservableProperty] private bool _canControl;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(WaitingForControl))] private bool _canControl;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(WaitingForControl))] private bool _inputActive = true;
+    public bool WaitingForControl => CanControl && !InputActive;
 }
+
+public sealed record RemoteControlSessionItem(string Identity, string Name, string State);
 
 public partial class PersonSelection(WorkplacePerson person) : ObservableObject
 {
@@ -84,6 +88,18 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     private readonly CancellationTokenSource lifetime = new();
     private readonly SemaphoreSlim mediaGate = new(1, 1);
     private readonly ConcurrentDictionary<string, VideoPicture> pendingFrames = new();
+    private readonly ConcurrentDictionary<string, bool> mutedCameras = new();
+    // One retired publication per participant/source fences late reader callbacks.
+    private readonly ConcurrentDictionary<string, string> retiredVideoTracks = new();
+    private static string VideoSourceKey(string identity) => identity.Contains(" · screen · ", StringComparison.Ordinal)
+        ? identity.Split(" · ")[0] + " · screen" : identity.Split(" · ")[0] + " · camera";
+    private bool IsVideoSuppressed(string identity) =>
+        identity.Contains(" · camera · ", StringComparison.Ordinal) && mutedCameras.ContainsKey(identity.Split(" · ")[0]) ||
+        retiredVideoTracks.TryGetValue(VideoSourceKey(identity), out var retired) && retired == identity;
+    private void DiscardPendingCamera(string identity)
+    {
+        foreach(var key in pendingFrames.Keys.Where(key => key.StartsWith(identity + " · camera · ", StringComparison.Ordinal)))pendingFrames.TryRemove(key,out _);
+    }
     private int frameScheduled;
     private bool disposed, refreshing, refreshAgain;
     private TaskCompletionSource? refreshCompletion;
@@ -114,8 +130,14 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     public string ScreenActionLabel => ScreenEnabled ? "Stop sharing" : "Share screen";
     public bool HasFocusedVideo => FocusedVideo != null;
     public VideoTileViewModel[] GalleryVideos => Videos.Where(x=>x != FocusedVideo).ToArray();
-    partial void OnFocusedVideoChanged(VideoTileViewModel? value) { OnPropertyChanged(nameof(GalleryVideos)); OnPropertyChanged(nameof(CanRequestFocusedControl)); }
-    public bool CanRequestFocusedControl => FocusedVideo is {IsScreen:true} tile && RemotePeers.Any(x=>x.Identity==tile.Identity.Split(" · ")[0] && x.CanHost && x.Sharing);
+    partial void OnFocusedVideoChanged(VideoTileViewModel? value)
+    {
+        OnPropertyChanged(nameof(GalleryVideos)); OnPropertyChanged(nameof(CanRequestFocusedControl));
+        OnPropertyChanged(nameof(ControlledScreen));
+        if (remoteStatus.Sessions.Count > 0)
+            media.SelectControlTarget(value is { IsScreen: true } ? value.Identity.Split(" · ")[0] : null);
+    }
+    public bool CanRequestFocusedControl => FocusedVideo is {IsScreen:true,CanControl:false} tile && RemotePeers.Any(x=>x.Identity==tile.Identity.Split(" · ")[0] && x.CanHost && x.Sharing);
     public bool HasFocusedScreen => FocusedVideo?.IsScreen == true;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasFocusedVideo)), NotifyPropertyChangedFor(nameof(HasFocusedScreen))] private VideoTileViewModel? _focusedVideo;
     public bool IsWaylandSession=>OperatingSystem.IsLinux()&&(!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"))||string.Equals(Environment.GetEnvironmentVariable("XDG_SESSION_TYPE"),"wayland",StringComparison.OrdinalIgnoreCase));
@@ -189,6 +211,7 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     [ObservableProperty, NotifyPropertyChangedFor(nameof(MicrophoneActionLabel))] private bool _microphoneEnabled;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CameraActionLabel))] private bool _cameraEnabled;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(RemoteDesktopAvailable)), NotifyPropertyChangedFor(nameof(ScreenActionLabel))] private bool _screenEnabled;
+    public ObservableCollection<RemoteControlSessionItem> ControlSessions { get; } = new();
     public bool RemoteDesktopAvailable => ScreenEnabled || RemotePeers.Any(x => x.CanHost && x.Sharing) || HasRemoteControl || ControlRequester != null;
     [ObservableProperty] private string _callTitle = "";
     [ObservableProperty] private IncomingCall? _incoming;
@@ -223,11 +246,11 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     [ObservableProperty] private DateTimeOffset? _eventDate = DateTimeOffset.Now.Date.AddDays(1);
     [ObservableProperty] private TimeSpan? _eventTime = new TimeSpan(9, 0, 0);
     [ObservableProperty] private string _durationMinutes = "30";
-    [ObservableProperty] private string _announcementTitle = "";
-    [ObservableProperty] private string _announcementBody = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(AnnouncementPreviewTitle))] private string _announcementTitle = "";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(AnnouncementPreviewBody))] private string _announcementBody = "";
     public string[] AnnouncementCategories { get; } = ["General", "Event", "Important action"];
     [ObservableProperty] private string _announcementCategory = "General";
-    [ObservableProperty] private DateTimeOffset? _publishDate;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ScheduleAnnouncement)), NotifyPropertyChangedFor(nameof(AnnouncementSubmitLabel)), NotifyPropertyChangedFor(nameof(AnnouncementPublishSummary))] private DateTimeOffset? _publishDate;
     [ObservableProperty] private TimeSpan? _publishTime = new TimeSpan(9, 0, 0);
     [ObservableProperty] private DateTimeOffset? _expiryDate = DateTimeOffset.Now.Date.AddDays(7);
     [ObservableProperty] private TimeSpan? _expiryTime = new TimeSpan(23, 59, 0);
@@ -237,8 +260,8 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     [ObservableProperty] private bool _acknowledgeResponseConflicts;
     [ObservableProperty] private bool _responseReviewed;
     [ObservableProperty] private bool _isMeeting = true;
-    [ObservableProperty] private bool _acknowledgeConflicts;
-    [ObservableProperty] private bool _reviewed;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanSaveCalendarForm))] private bool _acknowledgeConflicts;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CalendarReviewHint)), NotifyPropertyChangedFor(nameof(CanSaveCalendarForm))] private bool _reviewed;
     [ObservableProperty] private DateTimeOffset? _rangeDate = DateTimeOffset.Now.Date;
     public string IncomingLabel => Incoming is null ? "" : $"{Incoming.CallerName} · {Incoming.MeetingTitle ?? Incoming.CallType + " call"}";
     public string DateRange => RangeDate is { } date ? date.ToString("dddd, d MMMM yyyy") : "Choose a date";
@@ -267,6 +290,11 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
         chat.PropertyChanged+=ChatConnectionChanged;
         Attendees = new AttendeePickerViewModel(api, People);
         CallAttendees = new AttendeePickerViewModel(api, new ObservableCollection<PersonSelection>());
+        Audience.CollectionChanged += (_, _) => RefreshAudienceBindings();
+        Conflicts.CollectionChanged += (_, _) => { OnPropertyChanged(nameof(HasCalendarConflicts)); OnPropertyChanged(nameof(CalendarReviewHint)); OnPropertyChanged(nameof(CanSaveCalendarForm)); };
+        Attendees.SelectedPeople.CollectionChanged += (_, _) => InvalidateCalendarFormReview();
+        Attendees.SelectedUnits.CollectionChanged += (_, _) => InvalidateCalendarFormReview();
+        Attendees.Emails.CollectionChanged += (_, _) => InvalidateCalendarFormReview();
         InitializeNotifications(notifications);
         api.MeetingChanged += OnMeetingChanged;
         chatService.WorkplaceChanged += OnInvalidated;
@@ -317,7 +345,14 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
         if (callId == change.CallId && change.CallEnded) _ = LeaveAsync();
     });
     private void OnMediaError(string message) => Dispatcher.UIThread.Post(() => { if (!disposed) Feedback = message; });
-    private void OnParticipantUpdated(MediaParticipantUpdate update) => Dispatcher.UIThread.Post(() =>
+    private void OnParticipantUpdated(MediaParticipantUpdate update)
+    {
+        if(update.Kind=="camera")
+        {
+            if(update.Value=="0") { mutedCameras[update.Identity]=true;DiscardPendingCamera(update.Identity); }
+            else { mutedCameras.TryRemove(update.Identity,out _);retiredVideoTracks.TryRemove(update.Identity+" · camera",out _); }
+        }
+        Dispatcher.UIThread.Post(() =>
     {
         if (disposed) return;
         var identity = update.Identity == auth.CurrentUser?.Id.ToString() ? "You" : update.Identity;
@@ -330,6 +365,7 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
         if (update.Kind == "camera" && update.Value == "0") tile.Frame = null;
         if (update.Kind == "quality") tile.Quality = update.Value switch { "0" => "Poor", "1" => "Good", "2" => "Excellent", "3" => "Disconnected", _ => "Checking" };
     });
+    }
     private void OnParticipantJoined(MediaParticipant participant) => Dispatcher.UIThread.Post(() =>
     {
         if (disposed) return;
@@ -345,7 +381,12 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
         try { var avatar = await Chat.GetParticipantAvatarAsync(user); if (!disposed && Videos.Contains(tile)) tile.Avatar = avatar; }
         catch { /* Initials remain available when no compressed picture can be loaded. */ }
     }
-    private void OnParticipantLeft(string identity) => Dispatcher.UIThread.Post(() =>
+    private void OnParticipantLeft(string identity)
+    {
+        if(identity.Contains(" · camera · ",StringComparison.Ordinal) || identity.Contains(" · screen · ",StringComparison.Ordinal))
+            retiredVideoTracks[VideoSourceKey(identity)]=identity;
+        foreach(var key in pendingFrames.Keys.Where(key=>key==identity || key.StartsWith(identity+" · ",StringComparison.Ordinal)))pendingFrames.TryRemove(key,out _);
+        Dispatcher.UIThread.Post(() =>
     {
         if (identity.Contains(" · camera · ", StringComparison.Ordinal))
         {
@@ -356,8 +397,9 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
         var lostControl=Videos.Any(x=>x.CanControl&&(x.Identity==identity||x.Identity.StartsWith(identity+" · ",StringComparison.Ordinal)));
         foreach (var tile in Videos.Where(x => x.Identity == identity || x.Identity.StartsWith(identity + " · ", StringComparison.Ordinal)).ToList())
         { if (FocusedVideo == tile) FocusedVideo = null; Videos.Remove(tile); }
-        if(lostControl)PauseRemoteInput();else OnPropertyChanged(nameof(ControlledScreen));
+        if(lostControl && remoteStatus.Sessions.Count == 0)PauseRemoteInput();else OnPropertyChanged(nameof(ControlledScreen));
     });
+    }
     private void OnCaptureStopped(string kind)
     {
         if (kind == "screen") Interlocked.Increment(ref screenCaptureVersion);
@@ -385,7 +427,7 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     public string ControlRequesterName => ControlRequester is {} id ? ParticipantName(id) : "";
     public DateTimeOffset? ControlRequestExpiresAt => remoteStatus.RequestExpiresAt;
     public string RemoteInputLatency => remoteStatus.InputRoundTripMs is {} ms ? $"Input round trip: {ms:0} ms · target ≤50 ms" : "Input target: ≤50 ms on a healthy low-latency connection";
-    public VideoTileViewModel? ControlledScreen => Videos.FirstOrDefault(x => x.IsScreen && x.CanControl);
+    public VideoTileViewModel? ControlledScreen => FocusedVideo is { IsScreen: true, CanControl: true } tile ? tile : null;
     public bool CanRequestScreenControl(VideoTileViewModel? tile) => tile is {IsScreen:true,CanControl:false} && RemotePeers.Any(x => x.Identity == tile.Identity.Split(" · ")[0] && x.CanHost && x.Sharing);
     [RelayCommand(CanExecute=nameof(CanRequestScreenControl))]
     private Task RequestScreenControlAsync(VideoTileViewModel? tile)
@@ -405,11 +447,15 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
         media.SendRemoteInput(input.ControlEpoch==0?input with{ControlEpoch=remoteStatus.InputEpoch}:input);
     }
     internal void ForwardRemoteKeyboard(RemoteInput input)=>ForwardRemoteInput(input);
-    internal void PauseRemoteInput()
+    private void SuspendRemoteInputLocally()
     {
         remoteInputPaused=true;
         foreach(var tile in Videos)tile.CanControl=false;
         OnPropertyChanged(nameof(ControlledScreen));
+    }
+    internal void PauseRemoteInput()
+    {
+        SuspendRemoteInputLocally();
         _=Task.Run(async()=>{try{await media.RevokeControlAsync();}catch{}});
     }
     internal void EmergencyRemoteStop()=>Dispatcher.UIThread.Post(()=>{if(!disposed)PauseRemoteInput();});
@@ -419,21 +465,44 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
         var previousController = remoteStatus.Controlling;
         var previousScreen = ControlledScreen;
         remoteStatus = status;
-        if(status.Controlling == null)remoteInputPaused=false;
+        if(status.Controlling == null && status.Sessions.Count == 0)remoteInputPaused=false;
         var selected = SelectedRemotePeer?.Identity;
         RemotePeers.Clear(); foreach (var peer in status.Peers.Where(x => x.CanHost && x.Sharing)) RemotePeers.Add(peer with {DisplayName=ParticipantName(peer.Identity)});
         SelectedRemotePeer = RemotePeers.FirstOrDefault(x => x.Identity == selected);
         ControlRequester = status.RequestedBy;
+        var sessionItems = new System.Collections.Generic.List<RemoteControlSessionItem>();
+        var identities = status.Sessions.Select(x => x.Identity).Concat(status.ApprovedControllers)
+            .Concat(new[]{status.Controller,status.Controlling}.OfType<string>()).Distinct();
+        foreach (var identity in identities)
+        {
+            var remote = status.Sessions.FirstOrDefault(x => x.Identity == identity);
+            var state = remote != null ? (remote.InputActive ? "You have input control" : "Approved · click the screen to control")
+                : status.Controller == identity ? "Controlling your desktop" : "Approved for your desktop · waiting";
+            sessionItems.Add(new(identity,ParticipantName(identity),state));
+        }
+        if (!ControlSessions.SequenceEqual(sessionItems))
+        {
+            ControlSessions.Clear(); foreach (var item in sessionItems) ControlSessions.Add(item);
+        }
         OnPropertyChanged(nameof(RemoteDesktopAvailable));
-        HasRemoteControl = status.Controller != null || status.Controlling != null;
+        HasRemoteControl = status.Controller != null || status.Controlling != null || status.Sessions.Count > 0 || status.ApprovedControllers.Count > 0;
         OnPropertyChanged(nameof(RemoteInputLatency));
-        RemoteControlLabel = status.Controller != null ? ParticipantName(status.Controller) + " is controlling your desktop · Ctrl+Alt+Escape revokes access" : status.Controlling != null ? "Controlling " + ParticipantName(status.Controlling) + " · Ctrl+Alt+Escape stops control" : status.HostUnavailableReason ?? "Remote control requires a supported native desktop share and the sharer’s approval. Browser participants can request control.";
-        foreach (var tile in Videos) tile.CanControl = !remoteInputPaused && status.Controlling != null && tile.Identity.StartsWith(status.Controlling + " · screen · ", StringComparison.Ordinal);
+        RemoteControlLabel = status.Controller != null ? ParticipantName(status.Controller) + " is controlling your desktop · Ctrl+Alt+Escape revokes access" : status.Controlling != null ? (status.InputActive ? "Controlling " : "Click the shared screen to control ") + ParticipantName(status.Controlling) + " · Ctrl+Alt+Escape stops control" : status.HostUnavailableReason ?? "Remote control requires a supported native desktop share and the sharer’s approval. Browser participants can request control.";
+        foreach (var tile in Videos)
+        {
+            var session = status.Sessions.FirstOrDefault(x => tile.IsScreen && tile.Identity.StartsWith(x.Identity + " · screen · ", StringComparison.Ordinal));
+            tile.CanControl = !remoteInputPaused && (session != null || status.Controlling != null && tile.Identity.StartsWith(status.Controlling + " · screen · ", StringComparison.Ordinal));
+            tile.InputActive = session?.InputActive ?? status.InputActive;
+        }
         OnPropertyChanged(nameof(CanRequestControl)); OnPropertyChanged(nameof(CanRequestFocusedControl)); OnPropertyChanged(nameof(ControlRequesterName));
         RequestScreenControlCommand.NotifyCanExecuteChanged();
         if (previousController != status.Controlling || previousScreen != ControlledScreen)
         {
-            if (ControlledScreen is {} controlled) FocusedVideo = controlled;
+            if (status.Controlling != null && (previousController != status.Controlling || FocusedVideo == null))
+            {
+                var target = Videos.FirstOrDefault(x => x.CanControl && x.Identity.StartsWith(status.Controlling + " · screen · ", StringComparison.Ordinal));
+                if (target != null) FocusedVideo = target;
+            }
             OnPropertyChanged(nameof(ControlledScreen));
         }
     }
@@ -444,10 +513,22 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     });
     [RelayCommand] private Task AllowControlAsync() => RunMedia(async () => { if (ControlRequester != null) await media.AnswerControlAsync(ControlRequester, true); });
     [RelayCommand] private Task DenyControlAsync() => RunMedia(async () => { if (ControlRequester != null) await media.AnswerControlAsync(ControlRequester, false); });
-    [RelayCommand] private Task StopControlAsync() => RunMedia(media.RevokeControlAsync);
+    [RelayCommand] private async Task EndControlSessionAsync(RemoteControlSessionItem? session)
+    {
+        if(session==null)return;
+        foreach(var tile in Videos.Where(x=>x.Identity.StartsWith(session.Identity+" · screen · ",StringComparison.Ordinal)))tile.CanControl=false;
+        OnPropertyChanged(nameof(ControlledScreen));
+        try{await media.RevokeControlSessionAsync(session.Identity);}catch(Exception ex){Feedback="Could not end the remote-control session: "+ex.Message;}
+    }
+    [RelayCommand] private async Task StopControlAsync()
+    {
+        // Security release must remain available while camera/device operations are busy.
+        SuspendRemoteInputLocally();
+        try{await media.RevokeControlAsync();}catch(Exception ex){Feedback="Remote input is paused locally. Could not revoke access: "+ex.Message;}
+    }
     private void OnVideo(VideoPicture picture)
     {
-        if (disposed || !InCall) return;
+        if (disposed || !InCall || IsVideoSuppressed(picture.Identity)) return;
         // One pending frame per tile and one UI dispatch, regardless of the producer rate.
         if (pendingFrames.Count >= 16 && !pendingFrames.ContainsKey(picture.Identity)) return;
         pendingFrames[picture.Identity] = picture;
@@ -458,7 +539,7 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
             if (disposed || !InCall) { pendingFrames.Clear(); return; }
             foreach (var key in pendingFrames.Keys)
             {
-                if (!pendingFrames.TryRemove(key, out var frame)) continue;
+                if (!pendingFrames.TryRemove(key, out var frame) || IsVideoSuppressed(key)) continue;
                 var tileKey = key.Contains(" · camera", StringComparison.Ordinal) ? key.Split(" · ")[0] : key;
                 var tile = Videos.FirstOrDefault(x => x.Identity == tileKey);
                 if (tile is null && Videos.Count < 16) { tile = new VideoTileViewModel(tileKey, ForwardRemoteInput) { Name = tileKey.Contains(" · screen", StringComparison.Ordinal) ? (tileKey.StartsWith("You · ", StringComparison.Ordinal) ? "Your screen" : ParticipantName(tileKey.Split(" · ")[0]) + "'s screen") : tileKey, CanControl = !remoteInputPaused && remoteStatus.Controlling != null && key.StartsWith(remoteStatus.Controlling + " · screen · ", StringComparison.Ordinal) }; Videos.Add(tile); }
@@ -466,7 +547,9 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
                 {
                     var firstFrame = tile.Frame == null;
                     tile.Frame = frame;
-                    if (firstFrame && tile.IsScreen) { FocusedVideo = tile; if (tile.CanControl) OnPropertyChanged(nameof(ControlledScreen)); }
+                    var session = remoteStatus.Sessions.FirstOrDefault(x => tile.IsScreen && tile.Identity.StartsWith(x.Identity + " · screen · ", StringComparison.Ordinal));
+                    if (session != null) { tile.CanControl = !remoteInputPaused; tile.InputActive = session.InputActive; }
+                    if (firstFrame && tile.IsScreen && FocusedVideo == null) { FocusedVideo = tile; if (tile.CanControl) OnPropertyChanged(nameof(ControlledScreen)); }
                 }
             }
         }, OperatingSystem.IsLinux() ? DispatcherPriority.Background : DispatcherPriority.Render);
@@ -678,7 +761,7 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
         finally
         {
             InCall = false; activeCallUsers.Clear(); activeCallConversation = null; ConnectingCall = false; MicrophoneEnabled = CameraEnabled = ScreenEnabled = false;
-            callClock.Stop(); FocusedVideo = null; Videos.Clear(); pendingFrames.Clear();
+            callClock.Stop(); FocusedVideo = null; Videos.Clear(); pendingFrames.Clear(); mutedCameras.Clear(); retiredVideoTracks.Clear();
         }
         await UpdateCallPresence();
         if (call != null) { await api.LeaveCallAsync(call); callId = null; }
@@ -687,10 +770,12 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
 
     private CalendarWrite Draft()
     {
-        if (string.IsNullOrWhiteSpace(EventTitle) || EventDate is null || EventTime is null) throw new InvalidOperationException("Enter a title, date and time.");
-        if (!int.TryParse(DurationMinutes, out var minutes) || minutes <= 0 || minutes > 10080) throw new InvalidOperationException("Duration must be between 1 minute and 7 days.");
+        if (string.IsNullOrWhiteSpace(EventTitle)) throw InvalidForm(nameof(EventTitle),"Enter a title, date and time.");
+        if (EventDate is null) throw InvalidForm(nameof(EventDate),"Enter a title, date and time.");
+        if (EventTime is null) throw InvalidForm(nameof(EventTime),"Enter a title, date and time.");
+        if (!int.TryParse(DurationMinutes, out var minutes) || minutes <= 0 || minutes > 10080) throw InvalidForm(nameof(DurationMinutes),"Duration must be between 1 minute and 7 days.");
         var local = DateTime.SpecifyKind(EventDate.Value.Date + EventTime.Value, DateTimeKind.Unspecified);
-        if (TimeZoneInfo.Local.IsInvalidTime(local) || TimeZoneInfo.Local.IsAmbiguousTime(local)) throw new InvalidOperationException("This local time falls in a daylight-saving transition. Choose another time.");
+        if (TimeZoneInfo.Local.IsInvalidTime(local) || TimeZoneInfo.Local.IsAmbiguousTime(local)) throw InvalidForm(nameof(EventTime),"This local time falls in a daylight-saving transition. Choose another time.");
         var participants = People.Where(x => x.Selected).Select(x => x.Id).ToArray();
         var start = TimeZoneInfo.ConvertTimeToUtc(local);
         return new(persistedCalendar?.Id, persistedCalendar?.Version ?? 0, IsMeeting ? 1 : 0, EventTitle.Trim(), EventDescription, start, start.AddMinutes(minutes), TimeZoneInfo.Local.Id, false, participants, ParticipantUnitIds: IsMeeting ? Attendees.UnitIds : null);
@@ -707,7 +792,7 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     {
         if (IsLoading && auth.Actions?.IsConnected!=false) return;
         IsLoading = auth.Actions?.IsConnected!=false;
-        try { Feedback = ""; await action(); }
+        try { Feedback = ""; FormValidationIssue = null; await action(); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Feedback = ex.Message; }
         finally { IsLoading = false; }
@@ -775,14 +860,15 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     [RelayCommand] private Task PublishAsync() => Work(async () =>
     {
         var targets = Audience.Where(x => x.Selected).Select(x => new AnnouncementTarget("User", x.Id)).ToArray();
-        if (string.IsNullOrWhiteSpace(AnnouncementTitle) || string.IsNullOrWhiteSpace(AnnouncementBody) || targets.Length == 0)
-            throw new InvalidOperationException("Enter a title, message and audience.");
+        if (string.IsNullOrWhiteSpace(AnnouncementTitle)) throw InvalidForm(nameof(AnnouncementTitle),"Enter a title, message and audience.");
+        if (string.IsNullOrWhiteSpace(AnnouncementBody)) throw InvalidForm(nameof(AnnouncementBody),"Enter a title, message and audience.");
+        if (targets.Length == 0) throw InvalidForm(nameof(Audience),"Enter a title, message and audience.");
         var now = DateTime.UtcNow;
         var publish = PublishDate is { } day ? DateTime.SpecifyKind(day.Date + (PublishTime ?? TimeSpan.Zero), DateTimeKind.Local).ToUniversalTime() : now;
-        if (ExpiryDate is not { } expiryDay) throw new InvalidOperationException("Choose an expiry date.");
+        if (ExpiryDate is not { } expiryDay) throw InvalidForm(nameof(ExpiryDate),"Choose an expiry date.");
         var expiry = DateTime.SpecifyKind(expiryDay.Date + (ExpiryTime ?? TimeSpan.Zero), DateTimeKind.Local).ToUniversalTime();
-        if (expiry <= publish) throw new InvalidOperationException("Expiry must be after publication.");
-        if (!AnnouncementCategories.Contains(AnnouncementCategory)) throw new InvalidOperationException("Choose a supported category.");
+        if (expiry <= publish) throw InvalidForm(nameof(ExpiryDate),"Expiry must be after publication.");
+        if (!AnnouncementCategories.Contains(AnnouncementCategory)) throw InvalidForm(nameof(AnnouncementCategory),"Choose a supported category.");
         if (!await Confirm("Publish announcement", $"{AnnouncementTitle}\n{AnnouncementBody}\n{publish.ToLocalTime():f} – {expiry.ToLocalTime():f}\n{targets.Length} recipients")) return;
         await api.PublishAsync(new AnnouncementWrite(null, 0, AnnouncementTitle.Trim(), AnnouncementBody, AnnouncementCategory, publish, expiry, AnnouncementImportant, RequiresAcknowledgement, targets, SendAnnouncementEmail), lifetime.Token);
         AnnouncementTitle = AnnouncementBody = ""; Feedback = publish > now ? "Announcement scheduled." : "Announcement published.";
@@ -808,6 +894,8 @@ public partial class WorkspaceViewModel : ViewModelBase, IAsyncDisposable
     {
         if(auth.Actions!=null)auth.Actions.Changed-=ConnectionQueueChanged;
         Chat.PropertyChanged-=ChatConnectionChanged;
+        foreach (var person in observedAudience) person.PropertyChanged -= AudiencePersonChanged;
+        observedAudience.Clear();
         Appearance.Dispose();
         chatService.AppearancePreferencesChanged -= AppearanceInvalidated;
         Clock.PropertyChanged -= OnClockFormatChanged;

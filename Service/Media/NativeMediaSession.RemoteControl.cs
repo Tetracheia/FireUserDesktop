@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
@@ -67,13 +68,16 @@ public sealed partial class NativeMediaSession
                 await foreach (var item in incomingData.ReadAllAsync(ct))
                 {
                     if(OperatingSystem.IsLinux() && ScreenSources.IsWayland && item.Packet.Type is "input" or "release" or "move") { await HandleWaylandInputAsync(item.Sender,item.Packet);continue; }
+                    if (item.Packet.Type is "acquire" or "yield") { await HandleOwnershipAsync(item.Sender, item.Packet); continue; }
                     lock (remoteLock)
                     {
                         var (sender, packet) = item;
                         if (!Connected || packet.Version != 1) continue;
                         if (packet.Type == "hello")
                         {
+                            var previousOwner = control.Controller;
                             if (control.Hello(sender, packet)) SendHello(sender);
+                            if (previousOwner != control.Controller) ReleaseHostedInput();
                         }
                         else if (packet.Type == "request" && canHost && packet.Scope == control.LocalScope)
                         {
@@ -93,12 +97,23 @@ public sealed partial class NativeMediaSession
                             }
                             else if (control.RequestedBy != sender) QueuePacket(sender, new RemotePacket("deny"));
                         }
-                        else if (packet.Type == "grant") control.AcceptGrant(sender, packet);
+                        else if (packet.Type == "grant")
+                        {
+                            if (!control.IsExpectedGrant(sender, packet)) continue;
+                            var previous = control.Controlling;
+                            if (previous != null && previous != sender && control.YieldTarget() is {} yield) QueuePacket(previous, yield);
+                            if (control.AcceptGrant(sender, packet)) { ResetClipboard(); EnsureGrantExpiry(); }
+                        }
+                        else if (packet.Type == "ownership" && control.AcceptOwnership(sender, packet))
+                        {
+                            ResetClipboard();
+                            // A click acknowledgement can arrive after the viewer changed source.
+                            if (sender != control.Controlling && control.YieldSession(sender) is {} yield) QueuePacket(sender, yield);
+                        }
                         else if (packet.Type == "deny") control.Deny(sender);
                         else if (packet.Type == "revoke")
                         {
-                            if (control.Controlling == sender) { control.StopControlling(); ResetClipboard(); }
-                            if (control.Controller == sender) RevokeLocal();
+                            RemovePeerControl(sender);
                             control.Deny(sender);
                         }
                         else if(packet.Type=="latency"&&control.Controlling==sender&&control.IsGrantPeer(sender,packet)&&packet.Probe>0)
@@ -227,18 +242,18 @@ public sealed partial class NativeMediaSession
         }
     }
     private void SendHello(string destination = "") => QueuePacket(destination,
-        new RemotePacket("hello", CanHost: canHost, Sharing: control.LocalScope != null, Scope: control.LocalScope,FastInput:true,ClipboardSupport:clipboardStore!=null,ExtendedInput:true));
+        new RemotePacket("hello", CanHost: canHost, Sharing: control.LocalScope != null, Scope: control.LocalScope,FastInput:true,ClipboardSupport:clipboardStore!=null,ExtendedInput:true,MultiControl:true));
     private void RevokeLocal()
     {
-        var controller = control.Controller;
+        var controllers = control.HostedIdentities;
         if(room!=IntPtr.Zero)LiveKitNative.fu_interactive_screen(room,0);
         ResetClipboard(); inputRtt=null;
-        control.Revoke(); grantExpiry?.Dispose(); grantExpiry = null;
+        control.Revoke();
         requestExpiry?.Dispose(); requestExpiry = null;
         inputLease?.Dispose(); inputLease = null;
         waylandGrantEpoch=0;
         if(waylandInput!=null)waylandInput.DisableInput();else if (room != IntPtr.Zero) LiveKitNative.fu_release_input();
-        if (controller != null && Connected) outgoingData?.Writer.TryWrite((controller, new RemotePacket("revoke")));
+        foreach (var controller in controllers) if (Connected) outgoingData?.Writer.TryWrite((controller, new RemotePacket("revoke")));
     }
     private void SetRemoteSharing(bool sharing, MediaDevices devices,ScreenCastPortal? portal=null)
     {
@@ -253,12 +268,89 @@ public sealed partial class NativeMediaSession
             SendHello(); RemoteControlChanged?.Invoke(CurrentControlStatus);
         }
     }
+    private void BroadcastOwnership()
+    {
+        foreach (var (peer, packet) in control.OwnershipPackets()) QueuePacket(peer, packet);
+    }
+    private async Task HandleOwnershipAsync(string sender, RemotePacket packet)
+    {
+        ScreenCastPortal? portal;
+        long epoch;
+        lock (remoteLock)
+        {
+            if (!Connected || !canHost || packet.Version != 1) return;
+            var changed = packet.Type == "acquire" ? control.Acquire(sender, packet) : control.Yield(sender, packet);
+            if (!changed) return;
+            ResetClipboard(); lastInputTick = Environment.TickCount64;
+            portal = waylandInput;
+            portal?.DisableInput(); waylandGrantEpoch = 0;
+            epoch = control.OwnershipPackets().FirstOrDefault(x => x.Peer == sender).Packet?.OwnershipEpoch ?? 0;
+            if (portal == null) ReleaseHostedInput();
+        }
+        if (portal != null) await portal.ReleaseInputAsync();
+        lock (remoteLock)
+        {
+            if (!Connected) return;
+            // Revocation/share termination while waiting for OS release wins.
+            if (packet.Type == "acquire" && control.Controller == sender &&
+                control.IsHostedGrantPeer(sender, packet with { OwnershipEpoch = epoch }) &&
+                portal != null && ReferenceEquals(portal, waylandInput))
+                waylandGrantEpoch = portal.EnableInput();
+            BroadcastOwnership(); RemoteControlChanged?.Invoke(CurrentControlStatus);
+        }
+    }
+    private void RemovePeerControl(string peer)
+    {
+        if (control.Controller == peer)
+        {
+            waylandInput?.DisableInput(); waylandGrantEpoch = 0;
+            ReleaseHostedInput();
+        }
+        control.RemoveHosted(peer); control.RemoveSession(peer); ResetClipboard();
+        BroadcastOwnership();
+    }
+    private void EnsureGrantExpiry()
+    {
+        if (grantExpiry != null) return;
+        grantExpiry = new Timer(_ =>
+        {
+            lock (remoteLock)
+            {
+                var previousOwner = control.Controller;
+                var sessions = control.SessionIdentities;
+                var expired = control.ExpireGrants();
+                var removed = sessions.Except(control.SessionIdentities).ToArray();
+                if (previousOwner != control.Controller) { waylandInput?.DisableInput(); waylandGrantEpoch = 0; ReleaseHostedInput(); }
+                if (expired.Count > 0 || removed.Length > 0)
+                {
+                    ResetClipboard();
+                    foreach (var peer in expired.Concat(removed).Distinct()) QueuePacket(peer, new("revoke"));
+                    BroadcastOwnership(); RemoteControlChanged?.Invoke(CurrentControlStatus);
+                }
+                if (control.HostedIdentities.Length == 0 && control.SessionIdentities.Length == 0)
+                { grantExpiry?.Dispose(); grantExpiry = null; }
+            }
+        }, null, TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(250));
+    }
+    public void SelectControlTarget(string? identity)
+    {
+        lock (remoteLock)
+        {
+            if (control.Controlling == identity) return;
+            if (control.Controlling is {} previous)
+            {
+                var release = control.YieldTarget() ?? control.Outgoing(new(previous + " · screen · ", 3));
+                if (release != null) QueuePacket(previous, release);
+            }
+            control.SelectTarget(identity); ResetClipboard();
+            RemoteControlChanged?.Invoke(CurrentControlStatus);
+        }
+    }
     public Task RequestControlAsync(string identity)
     {
         lock (remoteLock)
         {
             if (!Connected) throw new InvalidOperationException("Join a call first.");
-            if (control.Controlling is { } previous) { QueuePacket(previous, new RemotePacket("revoke")); control.StopControlling(); ResetClipboard(); }
             QueuePacket(identity, control.BeginRequest(identity)); RemoteControlChanged?.Invoke(CurrentControlStatus);
         }
         return Task.CompletedTask;
@@ -277,7 +369,7 @@ public sealed partial class NativeMediaSession
             requestExpiry?.Dispose(); requestExpiry = null;
             if (allow)
             {
-                if(waylandInput!=null)waylandGrantEpoch=waylandInput.EnableInput();
+                if(waylandInput!=null && waylandGrantEpoch == 0)waylandGrantEpoch=waylandInput.EnableInput();
                 QueuePacket(identity, control.Approve(identity));
                 LiveKitNative.Check(LiveKitNative.fu_interactive_screen(room,1),"interactive screen");
                 lastInputTick = Environment.TickCount64;
@@ -287,16 +379,19 @@ public sealed partial class NativeMediaSession
                     lock (remoteLock)
                         if (control.Controller != null && Environment.TickCount64 - lastInputTick > 1500) ReleaseHostedInput();
                 }, null, TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(250));
-                grantExpiry?.Dispose();
-                grantExpiry = new Timer(_ =>
-                {
-                    lock (remoteLock)
-                    {
-                        RevokeLocal(); QueuePacket(identity, new RemotePacket("revoke")); RemoteControlChanged?.Invoke(CurrentControlStatus);
-                    }
-                }, null, TimeSpan.FromMinutes(5), Timeout.InfiniteTimeSpan);
+                EnsureGrantExpiry();
             }
             else { control.Deny(identity); QueuePacket(identity, new RemotePacket("deny")); }
+            RemoteControlChanged?.Invoke(CurrentControlStatus);
+        }
+        return Task.CompletedTask;
+    }
+    public Task RevokeControlSessionAsync(string identity)
+    {
+        lock (remoteLock)
+        {
+            RemovePeerControl(identity);
+            if (Connected) QueuePacket(identity, new("revoke"));
             RemoteControlChanged?.Invoke(CurrentControlStatus);
         }
         return Task.CompletedTask;
@@ -305,10 +400,9 @@ public sealed partial class NativeMediaSession
     {
         lock (remoteLock)
         {
-            var controller = control.Controller; var controlling = control.Controlling;
+            var sessions = control.SessionIdentities;
             RevokeLocal(); control.StopControlling();
-            if (controller != null) QueuePacket(controller, new RemotePacket("revoke"));
-            if (controlling != null) QueuePacket(controlling, new RemotePacket("revoke"));
+            foreach (var peer in sessions) QueuePacket(peer, new RemotePacket("revoke"));
             RemoteControlChanged?.Invoke(CurrentControlStatus);
         }
         return Task.CompletedTask;
@@ -323,7 +417,7 @@ public sealed partial class NativeMediaSession
                 if(Environment.TickCount64-lastExtendedNotice>3000){lastExtendedNotice=Environment.TickCount64;Error?.Invoke("Update the other desktop client to use scrolling, extra mouse buttons and extended keyboard keys.");}
                 return;
             }
-            if(input.Kind is 4 or 5){ClipboardGesture(input.Kind==5);return;}
+            if(input.Kind is 4 or 5){if(control.InputActive)ClipboardGesture(input.Kind==5);return;}
             if((input.Kind is 1 or 6) && input.PositionIncluded&&control.Controlling is {} oldPeer&&control.Peers.TryGetValue(oldPeer,out var oldCapability)&&!oldCapability.FastInput)
             {
                 var position=control.Outgoing(input with{Kind=0,Code=0,Down=false,PositionIncluded=false});
@@ -343,7 +437,7 @@ public sealed partial class NativeMediaSession
     {
         lock (remoteLock)
         {
-            if (kind == 1) { if (control.Controller == identity) RevokeLocal(); control.Remove(identity); }
+            if (kind == 1) { RemovePeerControl(identity); control.Remove(identity); }
             if (kind == 2) { RevokeLocal(); control.Clear(); }
             if (kind == 4 && Connected) SendHello(identity);
             if(control.Controller==null&&control.Controlling==null)ResetClipboard();

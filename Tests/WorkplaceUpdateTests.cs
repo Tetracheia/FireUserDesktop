@@ -120,7 +120,7 @@ public sealed class WorkplaceUpdateTests
     public async Task NativeForms_RenderReadonlyVacationDaysAndManagementPrerequisites()
     {
         var (vm,_,_,_)=Create(); var view=new WorkspaceView { DataContext=vm, ShowReviewAsync=(_,_,_)=>Task.FromResult(true) }; var owner=new Window { Content=view,Width=1000,Height=800 }; owner.Show(); vm.ShowVacationEditor=true; Dispatcher.UIThread.RunJobs();
-        var window=Assert.Single(view.EditorWindows); Assert.True(window.GetVisualDescendants().OfType<TextBox>().Single(x=>Avalonia.Automation.AutomationProperties.GetName(x)=="Vacation working days").IsReadOnly);
+        var window=Assert.Single(view.EditorWindows); Assert.NotNull(window.GetVisualDescendants().OfType<TextBlock>().Single(x=>Avalonia.Automation.AutomationProperties.GetName(x)=="Vacation working days")); Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBox>(),x=>Avalonia.Automation.AutomationProperties.GetName(x)=="Vacation working days");
         await window.CloseAnimatedAsync(); vm.Attendees.People.Add(new(new(Guid.NewGuid(),"Alice Example"))); vm.Attendees.People.Add(new(new(Guid.NewGuid(),"Bob Example")) { Selected=true });
         var picker=new AttendeePickerWindow(vm.Attendees,true); picker.Show(owner); Dispatcher.UIThread.RunJobs();
         if (Environment.GetEnvironmentVariable("FIREUSER_TEST_ARTIFACTS") is {} artifacts) { Directory.CreateDirectory(artifacts); using var frame = picker.CaptureRenderedFrame(); Assert.NotNull(frame); using var file = File.Create(Path.Combine(artifacts,"workplace-attendee-picker.png")); frame.Save(file,new Avalonia.Media.Imaging.PngBitmapEncoderOptions()); }

@@ -40,21 +40,10 @@ public partial class ChatView : UserControl
         };
         flyout.ShowAt(EmojiButton);
     }
-    private async void JoinCall_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) { if (DataContext is ChatViewModel { Workspace: {} workspace } && sender is Control { DataContext: ChatMessageItemViewModel { Message.CallSummary: {} call } }) await workspace.JoinExistingCallAsync(call.CallId); }
     private void SharedAttachment_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (model != null && sender is Control { DataContext: ChatAttachmentItemViewModel attachment } && TopLevel.GetTopLevel(this) is Window owner)
         { var index = model.AllAttachments.IndexOf(attachment); if (index >= 0) { sharedGallery?.Close(); sharedGallery = new AttachmentGalleryWindow(model.AllAttachments.ToArray(), index); sharedGallery.ShowDialog(owner); } }
-    }
-    private void Message_ContextRequested(object? sender, ContextRequestedEventArgs e)
-    {
-        if (DataContext is ChatViewModel vm && sender is Control { DataContext: ChatMessageItemViewModel item } target)
-        { MessageMenus.Open(target, MessageMenus.Create(vm, item, target), e.TryGetPosition(target, out _)); e.Handled = true; }
-    }
-    private void MessageMenu_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (DataContext is ChatViewModel vm && sender is Control { DataContext: ChatMessageItemViewModel item } target)
-            MessageMenus.Open(target, MessageMenus.Create(vm, item, target), false);
     }
     private ContextMenu ConversationMenu(RecipientItemViewModel? recipient = null)
     {

@@ -242,7 +242,7 @@ public sealed partial class NativeMediaSession : INativeMediaSession
         try
         {
             Connected = false; lifetime?.Cancel();
-            lock (remoteLock) { RevokeLocal(); control.Clear(); canHost = false; RemoteControlChanged?.Invoke(CurrentControlStatus); }
+            lock (remoteLock) { RevokeLocal(); control.Clear(); grantExpiry?.Dispose(); grantExpiry = null; canHost = false; RemoteControlChanged?.Invoke(CurrentControlStatus); }
             foreach (var capture in captures.Values) { await capture.StopAsync(); capture.Dispose(); }
             captures.Clear();
             await Task.WhenAll(remoteReader, remoteWriter,moveWriter,clipboardCleanup);

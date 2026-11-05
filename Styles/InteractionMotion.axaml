@@ -1,0 +1,13 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="using:UserIdentityDesktop.Views">
+  <Style Selector="Window"><Setter Property="views:MotionPreferences.Enabled" Value="True"/></Style>
+  <Style Selector="FlyoutPresenter, MenuFlyoutPresenter, Calendar"><Setter Property="views:PopupMotion.Enabled" Value="True"/></Style>
+  <!-- Outside rings do not change the size or position of the focused control. -->
+  <Style Selector="Button, ToggleButton, TextBox, ComboBox, CheckBox, RadioButton, ListBoxItem, TabItem, CalendarDatePicker, TimePicker">
+    <Setter Property="FocusAdorner"><Template><Border BorderBrush="{DynamicResource ForgeBorderFocus}" BorderThickness="2" CornerRadius="10" Margin="-3" IsHitTestVisible="False"/></Template></Setter>
+  </Style>
+  <Style Selector="Button /template/ ContentPresenter">
+    <Setter Property="Transitions"><Transitions><BrushTransition Property="Background" Duration="0:0:0.12"/><BrushTransition Property="BorderBrush" Duration="0:0:0.12"/><DoubleTransition Property="Opacity" Duration="0:0:0.12"/></Transitions></Setter>
+  </Style>
+  <Style Selector=".reduced-motion Control"><Setter Property="Transitions" Value="{x:Null}"/></Style>
+  <Style Selector=".reduced-motion Button /template/ ContentPresenter"><Setter Property="Transitions" Value="{x:Null}"/></Style>
+</Styles>

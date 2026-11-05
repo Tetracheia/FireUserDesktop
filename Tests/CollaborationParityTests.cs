@@ -207,7 +207,7 @@ public sealed class CollaborationParityTests
     {
         var (vm, api, _, _) = Create(); vm.VacationReason = "Family";
         api.VacationReadinessAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(new VacationReadiness(true, null));
-        api.PreviewVacationRangeAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), "Family", Arg.Any<CancellationToken>()).Returns(new VacationPreview(new(), "preview", new()));
+        api.PreviewVacationRangeAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), "Family", Arg.Any<CancellationToken>()).Returns(new VacationPreview(new() { new(DateOnly.FromDateTime(DateTime.Today.AddDays(1)), DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(1).AddHours(8), 1) }, "preview", new()));
         await vm.PreviewVacationCommand.ExecuteAsync(null); Assert.Equal("preview", vm.VacationReview!.PreviewToken); Assert.False(vm.IsLoading); Assert.False(vm.MediaBusy);
         vm.VacationEnd = vm.VacationStart!.Value.AddDays(-1); Assert.Null(vm.VacationReview);
         await vm.SubmitVacationCommand.ExecuteAsync(null);
@@ -292,16 +292,18 @@ public sealed class CollaborationParityTests
         window.CloseAfterCall(); Dispatcher.UIThread.RunJobs(); await vm.DisposeAsync();
     }
     [AvaloniaFact]
-    public async Task FullscreenShortcut_RequiresScreenShare_AndShareEndRestoresMaximizedWindow()
+    public async Task FullscreenShortcut_SupportsGalleryAndShare_AndEscapeRestoresMaximizedWindow()
     {
         var (vm, api, media, _) = Create(); await Start(vm,api);
         var window = new CallWindow { DataContext = vm }; window.Show(); window.WindowState = WindowState.Maximized;
         window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.F11 });
-        Assert.Equal(WindowState.Maximized,window.WindowState);
+        Dispatcher.UIThread.RunJobs();Assert.Contains("share-fullscreen",window.Classes);
+        window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });Dispatcher.UIThread.RunJobs();Assert.Equal(WindowState.Maximized,window.WindowState);
         media.VideoReceived += Raise.Event<Action<VideoPicture>>(new VideoPicture("peer · screen · share",2,2,new byte[16])); Dispatcher.UIThread.RunJobs();
         window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.F11 }); Dispatcher.UIThread.RunJobs();
         Assert.Equal(OperatingSystem.IsLinux()?WindowState.Normal:WindowState.FullScreen,window.WindowState);Assert.Contains("share-fullscreen",window.Classes);
-        media.ParticipantLeft += Raise.Event<Action<string>>("peer · screen · share"); Dispatcher.UIThread.RunJobs();
+        media.ParticipantLeft += Raise.Event<Action<string>>("peer · screen · share"); Dispatcher.UIThread.RunJobs();Assert.Contains("share-fullscreen",window.Classes);
+        window.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });Dispatcher.UIThread.RunJobs();
         Assert.Equal(WindowState.Maximized,window.WindowState); Assert.DoesNotContain("share-fullscreen",window.Classes); Assert.True(vm.InCall);
         await media.DidNotReceive().DisconnectAsync(); window.CloseAfterCall(); Dispatcher.UIThread.RunJobs(); await vm.DisposeAsync();
     }

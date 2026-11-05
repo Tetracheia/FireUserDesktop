@@ -83,6 +83,7 @@ public sealed class DesktopIconography : AvaloniaObject
         if(Has("download all","archive"))return "Archive";if(Has("download"))return "Download";
         if(Has("pause"))return "Pause";if(value=="stop" || Has("stop control","revoke"))return "Stop";if(Has("play"))return "Play";
         if(Has("emoji","smile","faces","gestures","symbols"))return "Emoji";
+        if(Has("mute","unmute","microphone"))return "Microphone";
         if(Has("volume","speaker","audio","music"))return "Audio";
         if(Has("camera","video"))return "Camera";if(Has("photo","image"))return "Image";
         if(Has("sign out","logout","exit"))return "SignOut";

@@ -27,6 +27,13 @@ public partial class ChatViewModel
             item.Message.PlayedDetails=MessageDetailsViewModel.MergePlayback(item.Message.PlayedDetails,new[]{new UserIdentityDesktop.Core.Models.PlayedReceipt(receipt.UserId,receipt.AttachmentId,receipt.PlayedAt)});
         }
     });
+    private readonly System.Collections.Generic.Dictionary<Guid,Task<string?>> messageSenderNames = new();
+    internal async Task<string?> ResolveMessageSenderAsync(Guid sender)
+    {
+        if(!messageSenderNames.TryGetValue(sender,out var pending))messageSenderNames[sender]=pending=GetPersonNameAsync(sender);
+        try { var name=await pending; if(string.IsNullOrWhiteSpace(name))messageSenderNames.Remove(sender);return name; }
+        catch { messageSenderNames.Remove(sender);throw; }
+    }
     internal async Task<string?> GetPersonNameAsync(Guid id)
     {
         if(id==CurrentUser.Id)return string.IsNullOrWhiteSpace(CurrentUser.DisplayName)?"You":CurrentUser.DisplayName;

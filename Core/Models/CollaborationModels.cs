@@ -65,7 +65,8 @@ public sealed record EncryptedFile(string Id, string Name, string MimeType, long
 }
 
 public sealed record VacationShift(DateOnly AnchorDate, DateTime StartUtc, DateTime EndUtc, decimal Days)
-{ public string Label => $"{AnchorDate:ddd, d MMM yyyy} · {WorkClock.Time(StartUtc.ToLocalTime())} – {WorkClock.Time(EndUtc.ToLocalTime())} · {Days:0.##} leave {(Days==1 ? "day" : "days")}"; }
+{ public string HoursLabel => $"{WorkClock.Time(StartUtc.ToLocalTime())} – {WorkClock.Time(EndUtc.ToLocalTime())} · {Days:0.##} leave {(Days==1 ? "day" : "days")}";
+  public string Label => $"{AnchorDate:ddd, d MMM yyyy} · {HoursLabel}"; }
 public sealed record VacationBalance(int Year, decimal Available, decimal Pending, decimal Approved, decimal Entitlement = 0, decimal Adjustments = 0, decimal Taken = 0)
 { public string Label => $"{Year}: {Available:0.##} days available · entitlement {Entitlement:0.##} · adjustments {Adjustments:0.##} · {Pending:0.##} pending · {Approved:0.##} approved · {Taken:0.##} taken"; }
 public sealed record VacationPreview(System.Collections.Generic.List<VacationShift> Shifts, string PreviewToken, System.Collections.Generic.List<VacationBalance> Balances);

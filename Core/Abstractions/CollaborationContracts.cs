@@ -83,9 +83,11 @@ public interface INativeMediaSession : IAsyncDisposable
     event Action<string>? CaptureStopped;
     event Action<RemoteControlStatus>? RemoteControlChanged;
     event Action<string>? ClipboardTransferChanged;
+    void SelectControlTarget(string? identity);
     Task RequestControlAsync(string identity);
     Task AnswerControlAsync(string identity, bool allow);
     Task RevokeControlAsync();
+    Task RevokeControlSessionAsync(string identity);
     void SendRemoteInput(RemoteInput input);
     Task ConnectAsync(MediaToken token, CancellationToken ct = default);
     Task SetMicrophoneAsync(bool enabled, MediaDevices devices, CancellationToken ct = default);

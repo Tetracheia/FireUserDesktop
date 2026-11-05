@@ -51,6 +51,7 @@ public class DateTimeFormatConverter : IValueConverter, IMultiValueConverter
             var local = dt.ToLocalTime();
             var now = DateTime.Now;
             if(parameter as string=="full")return UserIdentityDesktop.Core.Models.WorkClock.DateTime(local);
+            if(parameter as string=="message")return local.Date==now.Date ? UserIdentityDesktop.Core.Models.WorkClock.Time(local) : local.ToString("d MMM yyyy")+" · "+UserIdentityDesktop.Core.Models.WorkClock.Time(local);
 
             if (local.Date == now.Date)
                 return UserIdentityDesktop.Core.Models.WorkClock.Time(local);

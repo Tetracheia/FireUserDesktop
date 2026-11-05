@@ -74,14 +74,16 @@ public partial class WorkspaceViewModel
     [ObservableProperty] private DateTimeOffset? _vacationStart = DateTimeOffset.Now.Date.AddDays(1);
     [ObservableProperty] private string _vacationDays = "0";
     [ObservableProperty] private DateTimeOffset? _vacationEnd = DateTimeOffset.Now.Date.AddDays(1);
-    [ObservableProperty] private bool _vacationReady;
-    [ObservableProperty] private string _vacationInstructions = "Choose dates to check your work schedule and leave policy.";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowVacationPrerequisite))] private bool _vacationReady;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowVacationPrerequisite))] private string _vacationInstructions = "Choose dates to check your work schedule and leave policy.";
+    public bool ShowVacationPrerequisite => !VacationReady && !string.IsNullOrWhiteSpace(VacationInstructions);
     public int VacationBalanceYear => VacationStart?.Year ?? DateTime.Now.Year;
     private long vacationDraftVersion;
     private string? reviewedVacationDraft;
     partial void OnVacationEndChanged(DateTimeOffset? value) => InvalidateVacation();
     private void InvalidateVacation()
     {
+        ClearFormIssue(nameof(VacationStart)); ClearFormIssue(nameof(VacationEnd));
         VacationReview = null; VacationDays = "0"; reviewedVacationDraft = null;
         OnPropertyChanged(nameof(VacationBalanceYear));
         _ = CalculateVacation(++vacationDraftVersion);
@@ -106,18 +108,34 @@ public partial class WorkspaceViewModel
     }
     private (DateOnly Start, DateOnly End) RangeDraft()
     {
-        if (VacationStart == null || VacationEnd == null || VacationEnd.Value.Date < VacationStart.Value.Date) throw new InvalidOperationException("Choose valid start and end dates.");
+        if (VacationStart == null || VacationEnd == null || VacationEnd.Value.Date < VacationStart.Value.Date) throw InvalidForm(VacationStart == null ? nameof(VacationStart) : nameof(VacationEnd),"Choose valid start and end dates.");
         return (DateOnly.FromDateTime(VacationStart.Value.Date), DateOnly.FromDateTime(VacationEnd.Value.Date));
     }
     private string RangeDraftKey() => $"{VacationStart:yyyy-MM-dd}|{VacationEnd:yyyy-MM-dd}|{VacationReason}";
 
     [ObservableProperty] private string _vacationReason = "";
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(VacationShifts)), NotifyPropertyChangedFor(nameof(VacationBalances)), NotifyPropertyChangedFor(nameof(VacationFormCommand))] private VacationPreview? _vacationReview;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(VacationShifts)), NotifyPropertyChangedFor(nameof(VacationBalances)), NotifyPropertyChangedFor(nameof(VacationFormCommand)), NotifyPropertyChangedFor(nameof(VacationReviewHint)), NotifyPropertyChangedFor(nameof(VacationPlanSummary)), NotifyPropertyChangedFor(nameof(VacationBalanceImpact))] private VacationPreview? _vacationReview;
     public System.Windows.Input.ICommand VacationFormCommand => VacationReview == null ? PreviewVacationCommand : SubmitVacationCommand;
+    public string VacationPlanSummary => VacationReview is {} review
+        ? review.Shifts.Count == 0 ? "No working shifts fall within these dates." : $"{review.Shifts.Sum(x => x.Days):0.##} leave {(review.Shifts.Sum(x => x.Days) == 1 ? "day" : "days")}"
+        : "Choose dates to see your leave plan";
+    public string VacationBalanceImpact => VacationReview is {} review
+        ? string.Join("\n", review.Balances.Select(balance => $"{balance.Year} balance: {balance.Available:0.##} available → {balance.Available - review.Shifts.Where(shift => shift.AnchorDate.Year == balance.Year).Sum(shift => shift.Days):0.##} after this request"))
+        : "";
+    [RelayCommand] private Task ReviewVacationRequestAsync() => Work(async () =>
+    {
+        await CalculateVacation(++vacationDraftVersion);
+        if (VacationReview == null || !VacationReady) throw InvalidForm(nameof(VacationEnd), VacationInstructions);
+        await SubmitReviewedVacationAsync();
+    });
     public System.Collections.Generic.IReadOnlyList<VacationShift> VacationShifts => VacationReview is {} review ? review.Shifts : Array.Empty<VacationShift>();
     public System.Collections.Generic.IReadOnlyList<VacationBalance> VacationBalances => VacationReview is {} review ? review.Balances : Array.Empty<VacationBalance>();
     [ObservableProperty] private VacationRequest? _selectedVacation;
     [ObservableProperty] private bool _showVacationEditor;
+    partial void OnShowVacationEditorChanged(bool value)
+    {
+        if (value && VacationReview == null) _ = CalculateVacation(++vacationDraftVersion);
+    }
     private bool ReviewsSelectedVacation => SelectedVacation is {} request && request.UserId != auth.CurrentUser?.Id && CalendarPeople.Any(person => person.Id == request.UserId && person.ReportingDistance == 1);
     public bool CanApproveVacation => SelectedVacation?.State == 0 && ReviewsSelectedVacation;
     public bool CanWithdrawVacation => SelectedVacation is { State: 0 } request && request.UserId == auth.CurrentUser?.Id;
@@ -150,15 +168,17 @@ public partial class WorkspaceViewModel
         if (VacationReview is {} review) await Confirm("Review vacation", VacationDetails(review));
     });
     private string VacationDetails(VacationPreview review) => $"{VacationStart:d} – {VacationEnd:d}\n{VacationDays} working days\n{VacationReason}\n" + string.Join("\n", review.Shifts.Select(x => x.Label)) + "\n" + string.Join("\n", review.Balances.Select(x => x.Label));
-    [RelayCommand] private Task SubmitVacationAsync() => Work(async () =>
+    [RelayCommand] private Task SubmitVacationAsync() => Work(SubmitReviewedVacationAsync);
+    private async Task SubmitReviewedVacationAsync()
     {
         var review = VacationReview ?? throw new InvalidOperationException("Preview your working shifts and balance first."); var draft = RangeDraft();
         if (!VacationReady || reviewedVacationDraft != RangeDraftKey()) throw new InvalidOperationException("Review the current dates and reason before submitting.");
-        if (!await Confirm("Submit vacation request", VacationDetails(review))) return;
+        if (review.Shifts.Sum(x => x.Days) <= 0) throw InvalidForm(nameof(VacationEnd), "No working shifts fall within these dates.");
+        if (!await Confirm("Review vacation request", VacationDetails(review) + "\n" + VacationBalanceImpact)) return;
         await api.SubmitVacationRangeAsync(auth.CurrentUser!.Id, draft.Start, draft.End, VacationReason, review.PreviewToken, lifetime.Token);
         VacationReview = null; reviewedVacationDraft = null; Feedback = "Vacation request submitted. The reporting policy determines approval."; vacationPage = 1; if (!IsVacationTab) await LoadVacations(); await RefreshAsync();
         SubmissionCompleted?.Invoke(WorkspaceFormKind.Vacation, Feedback);
-    });
+    }
     [RelayCommand] private Task RefreshVacationsAsync() => Work(async () => { vacationPage = 1; await LoadVacations(); });
     [RelayCommand] private Task MoreVacationsAsync() => Work(async () => { if (VacationsHaveMore) { vacationPage++; await LoadVacations(); } });
     private async Task LoadVacations()

@@ -11,6 +11,9 @@ namespace UserIdentityDesktop.Views;
 public sealed class EnterSubmit : AvaloniaObject
 {
     public static readonly AttachedProperty<ICommand?> CommandProperty = AvaloniaProperty.RegisterAttached<EnterSubmit, Control, ICommand?>("Command");
+    public static readonly AttachedProperty<bool> MultilineNewLineProperty = AvaloniaProperty.RegisterAttached<EnterSubmit, Control, bool>("MultilineNewLine");
+    public static bool GetMultilineNewLine(Control control) => control.GetValue(MultilineNewLineProperty);
+    public static void SetMultilineNewLine(Control control, bool value) => control.SetValue(MultilineNewLineProperty,value);
     public static ICommand? GetCommand(Control control) => control.GetValue(CommandProperty);
     public static void SetCommand(Control control, ICommand? value) => control.SetValue(CommandProperty, value);
     static EnterSubmit() => CommandProperty.Changed.AddClassHandler<Control>((control, _) =>
@@ -22,6 +25,9 @@ public sealed class EnterSubmit : AvaloniaObject
     {
         if (e.Handled || e.Key != Key.Enter || e.KeyModifiers != KeyModifiers.None || sender is not Control form || e.Source is not Control source) return;
         if (source is not TextBox && source.FindAncestorOfType<TextBox>() == null) return;
+        var text = source as TextBox ?? source.FindAncestorOfType<TextBox>();
+        if (GetMultilineNewLine(form) && text?.AcceptsReturn == true) return;
+        if (source.FindAncestorOfType<CalendarDatePicker>() != null) return;
         // Keep selection keys in an open combo/dropdown local to that control.
         if (source.FindAncestorOfType<ComboBox>() is { IsDropDownOpen: true }) return;
         if (GetCommand(form) is not {} command) return;

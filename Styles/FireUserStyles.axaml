@@ -32,11 +32,12 @@
         </Style>
 
         <StyleInclude Source="/Styles/Collaboration.axaml" />
+        <StyleInclude Source="/Styles/FireCalendar.axaml" />
 
         <!-- Fire Button Style -->
         <Style Selector="Button.fire-btn">
-            <Setter Property="Background" Value="{DynamicResource ForgePrimaryGradient}" />
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="{DynamicResource ForgeActionGradient}" />
+            <Setter Property="Foreground" Value="{DynamicResource ForgeOnPrimary}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="16,10" />
@@ -49,11 +50,12 @@
             </Setter>
         </Style>
         <Style Selector="Button.fire-btn:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource ForgePrimaryHover}" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Opacity" Value="0.92" />
+            <Setter Property="Background" Value="{DynamicResource ForgeActionHover}" />
+            <Setter Property="Foreground" Value="{DynamicResource ForgeOnPrimary}" />
+            <Setter Property="Opacity" Value="1" />
         </Style>
 
+        <Style Selector="Button.fire-btn:pressed /template/ ContentPresenter"><Setter Property="Background" Value="{DynamicResource ForgeAction}" /><Setter Property="Foreground" Value="{DynamicResource ForgeOnPrimary}" /></Style>
         <!-- Secondary Button Style -->
         <Style Selector="Button.secondary-btn">
             <Setter Property="Background" Value="{DynamicResource ForgeBgSecondary}" />
@@ -88,6 +90,10 @@
             <Setter Property="Opacity" Value="0.84" />
         </Style>
 
+        <Style Selector="TextBox"><Setter Property="PlaceholderForeground" Value="{DynamicResource ForgeTextMuted}" /></Style>
+        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement"><Setter Property="Background" Value="{DynamicResource ForgeBgSecondary}" /></Style>
+        <Style Selector="TextBox:focus"><Setter Property="PlaceholderForeground" Value="{DynamicResource ForgeTextMuted}" /></Style>
+        <Style Selector="TextBox /template/ TextBlock#PART_Placeholder"><Setter Property="Foreground" Value="{DynamicResource ForgeTextMuted}"/><Setter Property="Opacity" Value="1"/></Style>
         <!-- Fire Input Box Style -->
         <Style Selector="TextBox">
             <Setter Property="Background" Value="{DynamicResource ForgeSurfaceCard}" />
@@ -108,4 +114,5 @@
   <Style Selector="Border.connection-banner"><Setter Property="Background" Value="{DynamicResource ForgeBgSecondary}"/><Setter Property="BorderBrush" Value="{DynamicResource ForgePrimary}"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="20,10"/></Style>
   <Style Selector="Button:not(.workspace-nav)"><Setter Property="Transitions"><Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.16"/></Transitions></Setter></Style>
   <Style Selector=".reduced-motion Button"><Setter Property="Transitions" Value="{x:Null}"/></Style>
+  <StyleInclude Source="/Styles/InteractionMotion.axaml" />
 </Styles>

@@ -360,7 +360,7 @@ public sealed class WorkspaceTests
         }
         tabs.SelectedIndex = 0;
         view.GetVisualDescendants().OfType<Button>().First(x => x.Tag?.ToString() == "0").Focus(Avalonia.Input.NavigationMethod.Tab); Dispatcher.UIThread.RunJobs();
-        Assert.Equal(210, view.FindControl<Border>("NavigationRail")!.Bounds.Width);
+        Assert.Equal(70, view.FindControl<Border>("NavigationRail")!.Bounds.Width);
         using (var expanded = window.CaptureRenderedFrame())
         {
             var output = Environment.GetEnvironmentVariable("FIREUSER_TEST_ARTIFACTS");

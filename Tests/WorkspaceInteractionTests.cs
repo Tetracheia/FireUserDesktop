@@ -13,7 +13,7 @@ using UserIdentityDesktop.Views;
 using Xunit;
 
 namespace UserIdentityDesktop.Tests;
-public sealed class WorkspaceInteractionTests
+public sealed partial class WorkspaceInteractionTests
 {
     private static (WorkspaceViewModel Vm, ICollaborationApi Api, IChatService Chat) Create()
     {
@@ -76,7 +76,7 @@ public sealed class WorkspaceInteractionTests
         vm.SelectedCalendarTab = 1; Dispatcher.UIThread.RunJobs(); vm.ShowVacationEditor = true; Dispatcher.UIThread.RunJobs();
         var vacationWindow = Assert.Single(view.EditorWindows); Assert.Equal(WorkspaceFormKind.Vacation, vacationWindow.Kind); Save(vacationWindow, $"vacation-form-{light}.png");
         api.VacationReadinessAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(new VacationReadiness(true, null));
-        api.PreviewVacationRangeAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new VacationPreview(new(), "vacation-review", new()));
+        api.PreviewVacationRangeAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new VacationPreview(new() { new(DateOnly.FromDateTime(DateTime.Today.AddDays(1)), DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(1).AddHours(8), 1) }, "vacation-review", new()));
         await vm.PreviewVacationCommand.ExecuteAsync(null); await vm.SubmitVacationCommand.ExecuteAsync(null); Dispatcher.UIThread.RunJobs(); Assert.Empty(view.EditorWindows); Assert.Equal(2, messages.Count); Assert.Contains("reporting policy", messages[1]);
         vm.SelectedWorkspaceTab = 3; Dispatcher.UIThread.RunJobs(); vm.ShowAnnouncementEditor = true; Dispatcher.UIThread.RunJobs();
         Save(Assert.Single(view.EditorWindows), $"announcement-form-{light}.png"); vm.AnnouncementTitle = "Notice"; vm.AnnouncementBody = "Updated schedule"; vm.ExpiryDate = DateTimeOffset.Now.AddDays(3); vm.Audience.Add(new(new(Guid.NewGuid(), "Audience")) { Selected = true });

@@ -84,7 +84,7 @@ public sealed class CallStageInteractionTests
     [InlineData(WindowState.Maximized,"button")]
     [InlineData(WindowState.Normal,"end")]
     [InlineData(WindowState.Maximized,"end")]
-    public async Task LinuxBorderlessShareCoversMonitorWithoutFullscreenAndRestoresWindow(WindowState initial,string exit)
+    public async Task LinuxBorderlessShareFitsWorkAreaAndRestoresWindow(WindowState initial,string exit)
     {
         if(!OperatingSystem.IsLinux())return;
         var (vm,media)=Create();vm.InCall=true;
@@ -101,13 +101,13 @@ public sealed class CallStageInteractionTests
         {
             window.FindControl<Button>("FullscreenButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Dispatcher.UIThread.RunJobs();
             Assert.Equal(WindowState.Normal,window.WindowState);Assert.Contains("share-fullscreen",window.Classes);
-            Assert.Equal(WindowDecorations.None,window.WindowDecorations);Assert.False(window.CanResize);Assert.False(window.Topmost);
-            Assert.Equal(monitor.Bounds.Position,window.Position);Assert.Equal(monitor.Bounds.Width/monitor.Scaling,window.Width);Assert.Equal(monitor.Bounds.Height/monitor.Scaling,window.Height);
+            Assert.Equal(WindowDecorations.None,window.WindowDecorations);Assert.True(window.CanResize);Assert.False(window.Topmost);
+            Assert.Equal(monitor.WorkingArea.Position,window.Position);Assert.Equal(monitor.WorkingArea.Width/monitor.Scaling,window.Width);Assert.Equal(monitor.WorkingArea.Height/monitor.Scaling,window.Height);
             Assert.Equal(0,window.MinWidth);Assert.Equal(0,window.MinHeight);Assert.True(double.IsPositiveInfinity(window.MaxWidth));Assert.True(double.IsPositiveInfinity(window.MaxHeight));
             Assert.False(vm.ShowCallChat);Assert.False(vm.ShowCallMembers);
             if(exit=="escape")window.RaiseEvent(new KeyEventArgs{RoutedEvent=InputElement.KeyDownEvent,Key=Key.Escape});
             else if(exit=="button")window.FindControl<Button>("ExitFullscreenButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            else media.ParticipantLeft+=Raise.Event<Action<string>>(track);
+            else { media.ParticipantLeft+=Raise.Event<Action<string>>(track); Dispatcher.UIThread.RunJobs(); Assert.Contains("share-fullscreen", window.Classes); window.RaiseEvent(new KeyEventArgs{RoutedEvent=InputElement.KeyDownEvent,Key=Key.Escape}); }
             Dispatcher.UIThread.RunJobs();
             Assert.DoesNotContain(WindowState.FullScreen,states);Assert.DoesNotContain("share-fullscreen",window.Classes);
             Assert.Equal(initial,window.WindowState);Assert.Equal(decorations,window.WindowDecorations);Assert.True(window.CanResize);
@@ -200,16 +200,16 @@ public sealed class CallStageInteractionTests
         window.CloseAfterCall();Dispatcher.UIThread.RunJobs();await vm.DisposeAsync();
     }
     [AvaloniaFact]
-    public async Task OnlyExplicitScreenShareFullscreen_IsAllowedAndBottomControlsHandleHoverAndFocus()
+    public async Task ExplicitFullscreenSupportsCameraAndShareWithPersistentKeyboardAccessibleControls()
     {
         var (vm,media)=Create();var window=new CallWindow{DataContext=vm,Width=1200,Height=800};window.Show();Dispatcher.UIThread.RunJobs();
         vm.FocusVideoCommand.Execute(vm.Videos[0]);window.WindowState=WindowState.FullScreen;Dispatcher.UIThread.RunJobs();Assert.NotEqual(WindowState.FullScreen,window.WindowState);Assert.DoesNotContain("share-fullscreen",window.Classes);
-        window.RaiseEvent(new KeyEventArgs{RoutedEvent=InputElement.KeyDownEvent,Key=Key.F11});Assert.NotEqual(WindowState.FullScreen,window.WindowState);Assert.DoesNotContain("share-fullscreen",window.Classes);
+        window.RaiseEvent(new KeyEventArgs{RoutedEvent=InputElement.KeyDownEvent,Key=Key.F11});Dispatcher.UIThread.RunJobs();Assert.Contains("share-fullscreen",window.Classes);window.RaiseEvent(new KeyEventArgs{RoutedEvent=InputElement.KeyDownEvent,Key=Key.Escape});Dispatcher.UIThread.RunJobs();Assert.DoesNotContain("share-fullscreen",window.Classes);
         var screen=new VideoTileViewModel("one · screen · track"){Name="Alice's screen",Frame=new("one · screen · track",2,2,new byte[16])};vm.Videos.Add(screen);vm.FocusedVideo=screen;Dispatcher.UIThread.RunJobs();
         window.FindControl<Button>("FullscreenButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Dispatcher.UIThread.RunJobs();Assert.Equal(OperatingSystem.IsLinux()?WindowState.Normal:WindowState.FullScreen,window.WindowState);Assert.Contains("share-fullscreen",window.Classes);
-        var controls=window.FindControl<Border>("FullscreenControls")!;var toolbar=window.FindControl<Border>("FullscreenToolbar")!;Assert.Equal(0,toolbar.Opacity);Assert.False(window.FindControl<ScrollViewer>("ParticipantGallery")!.IsVisible);
+        var controls=window.FindControl<Border>("FullscreenControls")!;var toolbar=window.FindControl<Border>("FullscreenToolbar")!;Assert.Equal(1,toolbar.Opacity);Assert.False(window.FindControl<ScrollViewer>("ParticipantGallery")!.IsVisible);
         var point=controls.TranslatePoint(new Point(controls.Bounds.Width/2,controls.Bounds.Height-4),window)!.Value;window.MouseMove(point);Dispatcher.UIThread.RunJobs();Assert.Equal(1,toolbar.Opacity);
-        window.MouseMove(new Point(4,4));Dispatcher.UIThread.RunJobs();Assert.Equal(0,toolbar.Opacity);
+        window.MouseMove(new Point(4,4));Dispatcher.UIThread.RunJobs();Assert.Equal(1,toolbar.Opacity);
         window.FindControl<Button>("ExitFullscreenButton")!.Focus();Dispatcher.UIThread.RunJobs();Assert.Equal(1,toolbar.Opacity);Save(window,"native-share-hover-controls.png");
         media.RemoteControlChanged+=Raise.Event<Action<RemoteControlStatus>>(new RemoteControlStatus(new[]{new NativePeer("one",true,true,Guid.NewGuid().ToString("N"))},null,null,null));Dispatcher.UIThread.RunJobs();
         Assert.True(vm.CanRequestFocusedControl);window.FindControl<Button>("FullscreenRequestControl")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await media.Received(1).RequestControlAsync("one");
@@ -268,7 +268,7 @@ public sealed class CallStageInteractionTests
         window.CloseAfterCall();Dispatcher.UIThread.RunJobs();await vm.DisposeAsync();
     }
     [AvaloniaFact]
-    public async Task ControlledCallRoutesScrollAndConsumesLocalToolbarInput()
+    public async Task ControlledCallRoutesScrollAndKeepsLocalExitButtonUsable()
     {
         var (vm,media)=Create();vm.InCall=true;const string track="one · screen · track";
         vm.Videos.Add(new(track,vm.ForwardRemoteKeyboard){Frame=new(track,16,9,new byte[16*9*4])});var window=new CallWindow{DataContext=vm};window.Show();Dispatcher.UIThread.RunJobs();
@@ -284,7 +284,7 @@ public sealed class CallStageInteractionTests
             var button=window.FindControl<Button>("ExitFullscreenButton")!;
             var local=button.TranslatePoint(new Point(button.Bounds.Width/2,button.Bounds.Height/2),window)!.Value;
             window.MouseDown(local,MouseButton.Left);window.MouseUp(local,MouseButton.Left);Dispatcher.UIThread.RunJobs();
-            Assert.Contains("share-fullscreen",window.Classes);
+            Assert.DoesNotContain("share-fullscreen",window.Classes);
         }
         finally{window.CloseAfterCall();Dispatcher.UIThread.RunJobs();await vm.DisposeAsync();}
     }
@@ -330,10 +330,198 @@ public sealed class CallStageInteractionTests
         var grant=policy.Approve("browser");Assert.True(policy.Authorize("browser",input with{Grant=grant.Grant}));Assert.False(policy.Authorize("another",input with{Grant=grant.Grant,Sequence=2}));Assert.Throws<InvalidOperationException>(()=>policy.BeginRequest("browser"));
         policy.Revoke();Assert.False(policy.Authorize("browser",input with{Grant=grant.Grant,Sequence=2}));
     }
+    [Theory]
+    [InlineData(-1920,0,1920,1032,1,1920,1032)]
+    [InlineData(0,48,3840,2112,2,1920,1056)]
+    [InlineData(64,-1080,1856,1080,1.5,1237.3333333333333,720)]
+    public void BorderlessWorkAreaExcludesDockAndPreservesMonitorOrigin(int x,int y,int width,int height,double scale,double logicalWidth,double logicalHeight)
+    {
+        var area = new PixelRect(x,y,width,height);
+        Assert.Equal(area, BorderlessPresentation.PresentationArea(new PixelRect(-1920,-1080,3840,2160),area));
+        var size = BorderlessPresentation.ClientSize(area,scale);
+        Assert.Equal(logicalWidth,size.Width,6); Assert.Equal(logicalHeight,size.Height,6);
+        var monitor = new PixelRect(-1920,0,1920,1080);
+        Assert.Equal(monitor,BorderlessPresentation.PresentationArea(monitor,default));
+    }
+    [AvaloniaTheory]
+    [InlineData(true,1200,800)] [InlineData(false,760,560)]
+    public async Task FullscreenSwitchesEverySourceAndGalleryWithoutExitingAndKeepsActionsInsideViewport(bool dark,int width,int height)
+    {
+        var (vm,media)=Create();vm.InCall=true;vm.CallTitle="Fire User · Design review";
+        var first=new VideoTileViewModel("one · screen · track"){Name="Alice’s screen",Frame=SyntheticFrame("one · screen · track",32,66,93)};
+        var second=new VideoTileViewModel("two · screen · track"){Name="Bob’s screen",Frame=SyntheticFrame("two · screen · track",95,42,25)};
+        vm.Videos.Add(first);vm.Videos.Add(second);vm.Videos[0].Frame=SyntheticFrame("one",34,57,44);
+        var window=new CallWindow{DataContext=vm,RequestedThemeVariant=dark?Avalonia.Styling.ThemeVariant.Dark:Avalonia.Styling.ThemeVariant.Light};window.Show();
+        try
+        {
+            window.FindControl<Button>("FullscreenButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Dispatcher.UIThread.RunJobs();
+            window.Width=width;window.Height=height;Dispatcher.UIThread.RunJobs();
+            var picker=window.FindControl<ComboBox>("FullscreenSourcePicker")!;
+            Assert.Equal(vm.Videos.Count,picker.Items.Count);Assert.True(window.FindControl<Border>("PresentationHeader")!.IsVisible);
+            foreach(var source in new[]{first,second,vm.Videos[0]})
+            {
+                picker.SelectedItem=source;Dispatcher.UIThread.RunJobs();Assert.Same(source,vm.FocusedVideo);
+                Assert.Same(source,window.FindControl<ContentControl>("FocusedStage")!.Content);Assert.Contains("share-fullscreen",window.Classes);
+            }
+            picker.SelectedItem=second;Dispatcher.UIThread.RunJobs();Save(window,$"fullscreen-source-{(dark?"dark":"light")}.png");
+            var members=window.FindControl<Border>("FullscreenToolbar")!.GetVisualDescendants().OfType<Button>().Single(x=>Equals(x.Content,"Members"));
+            var chat=window.FindControl<Border>("FullscreenToolbar")!.GetVisualDescendants().OfType<Button>().Single(x=>Equals(x.Content,"Chat"));
+            members.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));chat.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Dispatcher.UIThread.RunJobs();
+            Assert.True(vm.ShowCallChat);if(width<1100)Assert.False(vm.ShowCallMembers);Assert.Contains("share-fullscreen",window.Classes);
+            chat.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));vm.ShowCallMembers=false;
+            vm.ClearVideoFocusCommand.Execute(null);Dispatcher.UIThread.RunJobs();Assert.True(window.FindControl<ScrollViewer>("ParticipantGallery")!.IsVisible);
+            Assert.False(window.FindControl<ContentControl>("FocusedStage")!.IsVisible);Assert.Contains("share-fullscreen",window.Classes);
+            Assert.All(window.FindControl<ScrollViewer>("ParticipantGallery")!.GetVisualDescendants().OfType<NativeVideoView>(),x=>Assert.False(x.RemoteControlEnabled));
+            var toolbar=window.FindControl<Border>("FullscreenControls")!;Assert.Equal(1,window.FindControl<Border>("FullscreenToolbar")!.Opacity);
+            var bottom=toolbar.TranslatePoint(new Point(0,toolbar.Bounds.Height),window)!.Value.Y;
+            Assert.InRange(bottom,0,window.ClientSize.Height);Assert.True(window.FindControl<ScrollViewer>("FullscreenToolbarScroll")!.Bounds.Height<=height*.4+1);
+            Save(window,$"fullscreen-gallery-{(dark?"dark":"light")}.png");
+            var activeSource=vm.FocusedVideo;
+            media.VideoReceived+=Raise.Event<Action<VideoPicture>>(SyntheticFrame("three · screen · new",50,50,50));Dispatcher.UIThread.RunJobs();
+            // Once a camera or share is selected, an arriving stream must not steal it.
+            picker.SelectedItem=first;media.VideoReceived+=Raise.Event<Action<VideoPicture>>(SyntheticFrame("four · screen · new",50,50,50));Dispatcher.UIThread.RunJobs();Assert.Same(first,vm.FocusedVideo);
+        }
+        finally{window.CloseAfterCall();Dispatcher.UIThread.RunJobs();await vm.DisposeAsync();}
+    }
+    [AvaloniaFact]
+    public async Task ApprovedSessionsRemainDimmedUntilOwnershipAndToolbarClicksNeverReachRemoteDevice()
+    {
+        var (vm,media)=Create();vm.InCall=true;
+        const string first="one · screen · track",second="two · screen · track";
+        media.VideoReceived+=Raise.Event<Action<VideoPicture>>(SyntheticFrame(first,32,66,93));media.VideoReceived+=Raise.Event<Action<VideoPicture>>(SyntheticFrame(second,95,42,25));Dispatcher.UIThread.RunJobs();
+        var peers=new[]{new NativePeer("one",true,true,"scope1"){MultiControl=true},new NativePeer("two",true,true,"scope2"){MultiControl=true}};
+        var status=new RemoteControlStatus(peers,null,null,"one"){Sessions=new[]{new RemoteSession("one",false),new RemoteSession("two",false)},InputActive=false,InputEpoch=1};
+        media.RemoteControlChanged+=Raise.Event<Action<RemoteControlStatus>>(status);Dispatcher.UIThread.RunJobs();
+        var window=new CallWindow{DataContext=vm,RequestedThemeVariant=Avalonia.Styling.ThemeVariant.Dark};window.Show();
+        try
+        {
+            window.FindControl<Button>("FullscreenButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Dispatcher.UIThread.RunJobs();
+            var tile=vm.Videos.Single(x=>x.Identity==first);Assert.True(tile.WaitingForControl);
+            var video=window.FindControl<ContentControl>("FocusedStage")!.GetVisualDescendants().OfType<NativeVideoView>().Single();Assert.False(video.RemoteInputActive);Assert.Equal(.5,video.Opacity);
+            using(var frame=window.CaptureRenderedFrame())Assert.NotNull(frame);
+            media.ClearReceivedCalls();video.ForwardKey(4,true,false);media.DidNotReceive().SendRemoteInput(Arg.Any<RemoteInput>());
+            var point=video.TranslatePoint(new Point(video.Bounds.Width/2,video.Bounds.Height/2),window)!.Value;
+            window.MouseDown(point,MouseButton.Left);window.MouseUp(point,MouseButton.Left);Dispatcher.UIThread.RunJobs();
+            media.Received().SendRemoteInput(Arg.Is<RemoteInput>(x=>x.Target==first&&x.Kind==1&&x.Down));Save(window,"fullscreen-control-passive.png");
+            media.RemoteControlChanged+=Raise.Event<Action<RemoteControlStatus>>(status with{InputActive=true,InputEpoch=2,Sessions=new[]{new RemoteSession("one",true),new RemoteSession("two",false)}});Dispatcher.UIThread.RunJobs();
+            Assert.False(tile.WaitingForControl);Assert.True(video.RemoteInputActive);Save(window,"fullscreen-control-active.png");
+            media.ClearReceivedCalls();
+            var chat=window.FindControl<Border>("FullscreenToolbar")!.GetVisualDescendants().OfType<Button>().Single(x=>Equals(x.Content,"Chat"));
+            var local=chat.TranslatePoint(new Point(chat.Bounds.Width/2,chat.Bounds.Height/2),window)!.Value;
+            window.MouseDown(local,MouseButton.Left);window.MouseUp(local,MouseButton.Left);Dispatcher.UIThread.RunJobs();
+            Assert.True(vm.ShowCallChat);media.DidNotReceive().SendRemoteInput(Arg.Is<RemoteInput>(x=>x.Kind!=3));
+            media.Received().SendRemoteInput(Arg.Is<RemoteInput>(x=>x.Kind==3));
+            window.FindControl<ComboBox>("FullscreenSourcePicker")!.SelectedItem=vm.Videos.Single(x=>x.Identity==second);Dispatcher.UIThread.RunJobs();
+            media.Received().SelectControlTarget("two");Assert.Contains("share-fullscreen",window.Classes);Assert.True(vm.Videos.Single(x=>x.Identity==second).CanControl);
+            Assert.Equal(2,vm.ControlSessions.Count);
+            var sessionsButton=window.FindControl<Button>("ControlSessionsButton")!;
+            sessionsButton.Flyout!.ShowAt(sessionsButton);Dispatcher.UIThread.RunJobs();
+            var flyout=Assert.IsType<Flyout>(sessionsButton.Flyout);
+            var end=Assert.IsAssignableFrom<Control>(flyout.Content).GetVisualDescendants().OfType<Button>().First(x=>Equals(x.Content,"End participant session"));
+            Assert.Same(vm.EndControlSessionCommand,end.Command);Assert.Equal("one",Assert.IsType<RemoteControlSessionItem>(end.CommandParameter).Identity);
+            Assert.True(end.Command!.CanExecute(end.CommandParameter));end.Command.Execute(end.CommandParameter);
+            await media.Received(1).RevokeControlSessionAsync("one");sessionsButton.Flyout.Hide();
+        }
+        finally{window.CloseAfterCall();Dispatcher.UIThread.RunJobs();await vm.DisposeAsync();}
+    }
+    [AvaloniaFact]
+    public void BorderlessExitRestoresFixedWindowAndQueuedFitCannotResizeItAgain()
+    {
+        var window=new Window{Width=900,Height=650,CanResize=false};window.Show();window.Position=new PixelPoint(80,90);
+        var presentation=new BorderlessPresentation(window);
+        try
+        {
+            presentation.Enter();Assert.True(window.CanResize);presentation.Exit();Dispatcher.UIThread.RunJobs();
+            Assert.False(presentation.IsActive);Assert.False(window.CanResize);Assert.Equal(900,window.Width);Assert.Equal(650,window.Height);
+            Assert.Equal(new PixelPoint(80,90),window.Position);Assert.Equal(WindowDecorations.Full,window.WindowDecorations);
+        }
+        finally{window.Close();}
+    }
+    [AvaloniaFact]
+    public async Task EmergencyStopCannotBeReenabledByQueuedUnselectedSessions()
+    {
+        var (vm,media)=Create();var track="one · screen · track";vm.Videos.Add(new(track));
+        var status=new RemoteControlStatus(new[]{new NativePeer("one",true,true,"scope")},null,null,"one")
+        {Sessions=new[]{new RemoteSession("one",false)},InputActive=false,InputEpoch=1};
+        try
+        {
+            media.RemoteControlChanged+=Raise.Event<Action<RemoteControlStatus>>(status);Dispatcher.UIThread.RunJobs();Assert.True(vm.Videos.Single(x=>x.Identity==track).CanControl);
+            vm.PauseRemoteInput();media.RemoteControlChanged+=Raise.Event<Action<RemoteControlStatus>>(status with{Controlling=null});Dispatcher.UIThread.RunJobs();
+            Assert.False(vm.Videos.Single(x=>x.Identity==track).CanControl);Assert.Null(vm.ControlledScreen);
+        }
+        finally{await vm.DisposeAsync();}
+    }
+    [AvaloniaFact]
+    public async Task StopControlRemainsAvailableWhileMediaIsBusyAndBlocksInputImmediately()
+    {
+        var (vm,media)=Create();vm.InCall=true;const string track="one · screen · track";vm.Videos.Add(new(track));
+        var pending=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        media.SetMicrophoneAsync(true,Arg.Any<MediaDevices>(),Arg.Any<CancellationToken>()).Returns(pending.Task);
+        media.RemoteControlChanged+=Raise.Event<Action<RemoteControlStatus>>(new RemoteControlStatus(new[]{new NativePeer("one",true,true,"scope")},null,null,"one"){InputEpoch=7});Dispatcher.UIThread.RunJobs();
+        var microphone=vm.ToggleMicrophoneCommand.ExecuteAsync(null);
+        try
+        {
+            Assert.True(vm.MediaBusy);await vm.StopControlCommand.ExecuteAsync(null);await media.Received(1).RevokeControlAsync();
+            Assert.True(vm.MediaBusy);Assert.False(vm.Videos.Single(x=>x.Identity==track).CanControl);
+            media.ClearReceivedCalls();vm.ForwardRemoteKeyboard(new(track,2,Code:4,Down:true,ControlEpoch:7));media.DidNotReceive().SendRemoteInput(Arg.Any<RemoteInput>());
+        }
+        finally{pending.TrySetResult();await microphone;await vm.DisposeAsync();}
+    }
+    private static VideoPicture SyntheticFrame(string identity,byte red,byte green,byte blue)
+    {
+        const int width=640,height=360;var pixels=new byte[width*height*4];
+        for(var y=0;y<height;y++)for(var x=0;x<width;x++)
+        {var i=(y*width+x)*4;var line=x%80<2||y%60<2;pixels[i]=(byte)(line?red+50:red);pixels[i+1]=(byte)(line?green+50:green);pixels[i+2]=(byte)(line?blue+50:blue);pixels[i+3]=255;}
+        return new(identity,width,height,pixels);
+    }
     private static void Save(Window window,string name)
     {
         if(Environment.GetEnvironmentVariable("FIREUSER_TEST_ARTIFACTS") is not {} path)return;
         Directory.CreateDirectory(path);Dispatcher.UIThread.RunJobs();using var frame=window.CaptureRenderedFrame();Assert.NotNull(frame);using var file=File.Create(Path.Combine(path,name));frame.Save(file,new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
+    }
+
+    [AvaloniaTheory][InlineData(false)][InlineData(true)]
+    public async Task CallChatUsesSharedBubblesWithSenderTimeAndMessageActions(bool light)
+    {
+        var (vm,_)=Create();vm.InCall=true;vm.ShowCallChat=true;
+        var peer=Guid.NewGuid();vm.Chat.SelectedRecipient=new(){ReceiverId=peer,ReceiverName="Maya Hassan"};Dispatcher.UIThread.RunJobs();
+        var incoming=new ChatMessageItemViewModel(new ChatMessage{MessageId="incoming",Sender=peer,SenderName="Maya Hassan",Receiver=vm.Chat.CurrentUser.Id,Text="The screen is ready.",TimeSent=new DateTime(2025,2,8,9,35,0,DateTimeKind.Utc)},false,Substitute.For<IChatService>(),Substitute.For<IFileService>(),Substitute.For<IImageService>());
+        var outgoing=new ChatMessageItemViewModel(new ChatMessage{MessageId="outgoing",Sender=vm.Chat.CurrentUser.Id,Text="I can see it now.",TimeSent=DateTime.UtcNow,Seen=true,IsEdited=true,ReplyToMessageId="incoming",ReplyToSenderName="Maya Hassan"},true,Substitute.For<IChatService>(),Substitute.For<IFileService>(),Substitute.For<IImageService>());
+        vm.Chat.Messages.Add(incoming);vm.Chat.Messages.Add(outgoing);
+        var window=new CallWindow{DataContext=vm,Width=1400,Height=900,RequestedThemeVariant=light?Avalonia.Styling.ThemeVariant.Light:Avalonia.Styling.ThemeVariant.Dark};window.Show();Dispatcher.UIThread.RunJobs();
+        try
+        {
+            var stream=window.FindControl<ListBox>("CallMessageStream")!;var cards=stream.GetVisualDescendants().OfType<ChatMessageCard>().ToArray();Assert.Equal(2,cards.Length);Assert.All(cards,x=>Assert.Same(vm.Chat,x.Chat));
+            Assert.Contains(cards,x=>x.SenderLabel=="You");Assert.Contains(cards,x=>x.SenderLabel=="Maya Hassan");
+            var rows=stream.GetVisualDescendants().OfType<Grid>().Where(x=>x.Classes.Contains("msg-row")).ToArray();Assert.Contains(rows,x=>x.Classes.Contains("mine")&&x.HorizontalAlignment==Avalonia.Layout.HorizontalAlignment.Right);Assert.Contains(rows,x=>x.Classes.Contains("theirs")&&x.HorizontalAlignment==Avalonia.Layout.HorizontalAlignment.Left);
+            var dates=stream.GetVisualDescendants().OfType<TextBlock>().Where(x=>Avalonia.Automation.AutomationProperties.GetName(x)=="Message sent at"&&x.IsEffectivelyVisible).ToArray();Assert.Equal(2,dates.Length);Assert.Contains(dates,x=>x.Text!.Contains("2025")&&x.Text.Contains(WorkClock.Time(incoming.TimeSent.ToLocalTime())));
+            Assert.Contains(stream.GetVisualDescendants().OfType<TextBlock>(),x=>x.Text=="Edited"&&x.IsEffectivelyVisible);Assert.Contains(stream.GetVisualDescendants().OfType<TextBlock>(),x=>x.Text==outgoing.ReplyLabel&&x.IsEffectivelyVisible);
+            var actions=stream.GetVisualDescendants().OfType<Button>().First(x=>Avalonia.Automation.AutomationProperties.GetName(x)=="Message actions");actions.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Dispatcher.UIThread.RunJobs();
+            Assert.NotNull(actions.ContextMenu);actions.ContextMenu!.Close();Dispatcher.UIThread.RunJobs();Save(window,$"call-chat-metadata-{(light?"light":"dark")}.png");
+        }
+        finally{window.CloseAfterCall();Dispatcher.UIThread.RunJobs();vm.Chat.UnregisterEvents();await vm.DisposeAsync();}
+    }
+    [AvaloniaTheory][InlineData("mute")][InlineData("unpublish")]
+    public async Task RemoteCameraOffDiscardsQueuedAndLateFramesWithoutStoppingTheShare(string stop)
+    {
+        var (vm,media)=Create();vm.InCall=true;const string camera="one · camera · old";const string share="one · screen · presentation";
+        var alice=vm.Videos.Single(x=>x.Identity=="one");vm.FocusedVideo=alice;
+        media.VideoReceived+=Raise.Event<Action<VideoPicture>>(new VideoPicture(camera,16,9,new byte[16*9*4]));Dispatcher.UIThread.RunJobs();Assert.NotNull(alice.Frame);
+        media.VideoReceived+=Raise.Event<Action<VideoPicture>>(new VideoPicture(camera,16,9,new byte[16*9*4]));
+        if(stop=="mute")media.ParticipantUpdated+=Raise.Event<Action<MediaParticipantUpdate>>(new MediaParticipantUpdate("one","camera","0"));else media.ParticipantLeft+=Raise.Event<Action<string>>(camera);
+        media.VideoReceived+=Raise.Event<Action<VideoPicture>>(new VideoPicture(camera,16,9,new byte[16*9*4]));media.VideoReceived+=Raise.Event<Action<VideoPicture>>(new VideoPicture(share,16,9,new byte[16*9*4]));Dispatcher.UIThread.RunJobs();
+        Assert.Null(alice.Frame);Assert.False(alice.HasFrame);Assert.Same(alice,vm.FocusedVideo);Assert.Contains(vm.Videos,x=>x.Identity==share&&x.HasFrame);
+        media.VideoReceived+=Raise.Event<Action<VideoPicture>>(new VideoPicture(camera,16,9,new byte[16*9*4]));Dispatcher.UIThread.RunJobs();Assert.Null(alice.Frame);
+        media.ParticipantUpdated+=Raise.Event<Action<MediaParticipantUpdate>>(new MediaParticipantUpdate("one","camera","1"));var renewed=new VideoPicture("one · camera · new",16,9,new byte[16*9*4]);media.VideoReceived+=Raise.Event<Action<VideoPicture>>(renewed);Dispatcher.UIThread.RunJobs();Assert.Same(renewed,alice.Frame);
+        vm.Chat.UnregisterEvents();await vm.DisposeAsync();
+    }
+    [AvaloniaFact]
+    public async Task UnpublishedShareCannotReturnFromAQueuedFrame()
+    {
+        var (vm,media)=Create();vm.InCall=true;const string share="one · screen · old";var frame=new VideoPicture(share,16,9,new byte[16*9*4]);
+        media.VideoReceived+=Raise.Event<Action<VideoPicture>>(frame);Dispatcher.UIThread.RunJobs();Assert.Contains(vm.Videos,x=>x.Identity==share);
+        media.VideoReceived+=Raise.Event<Action<VideoPicture>>(frame);media.ParticipantLeft+=Raise.Event<Action<string>>(share);media.VideoReceived+=Raise.Event<Action<VideoPicture>>(frame);Dispatcher.UIThread.RunJobs();Assert.DoesNotContain(vm.Videos,x=>x.Identity==share);
+        vm.Chat.UnregisterEvents();await vm.DisposeAsync();
     }
 
 }

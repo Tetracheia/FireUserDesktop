@@ -20,6 +20,8 @@ public sealed class NativeVideoView : Control
     public bool RemoteControlEnabled { get => GetValue(RemoteControlEnabledProperty); set => SetValue(RemoteControlEnabledProperty, value); }
     public static readonly StyledProperty<ICommand?> InputCommandProperty = AvaloniaProperty.Register<NativeVideoView, ICommand?>(nameof(InputCommand));
     public ICommand? InputCommand { get => GetValue(InputCommandProperty); set => SetValue(InputCommandProperty, value); }
+    public static readonly StyledProperty<bool> RemoteInputActiveProperty = AvaloniaProperty.Register<NativeVideoView, bool>(nameof(RemoteInputActive), true);
+    public bool RemoteInputActive { get => GetValue(RemoteInputActiveProperty); set => SetValue(RemoteInputActiveProperty, value); }
     private long lastMove;
     private bool releasingPointer;
     private bool inputSuspended;
@@ -39,7 +41,7 @@ public sealed class NativeVideoView : Control
         RemoteControlEnabledProperty.Changed.AddClassHandler<NativeVideoView>((view, _) =>
         { if (!view.RemoteControlEnabled) { view.inputSuspended=false; view.lastLinuxPosition=null; } });
     }
-    private void UpdateFrame() { frameDirty = true; InvalidateVisual(); }
+    private void UpdateFrame() { frameDirty = true; if (Frame == null) { bitmap?.Dispose(); bitmap = null; } InvalidateVisual(); }
     private void CopyFrame()
     {
         var frame = Frame;
@@ -74,7 +76,7 @@ public sealed class NativeVideoView : Control
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) { base.OnAttachedToVisualTree(e); UpdateFrame(); }
     private void Send(int kind, double x = 0, double y = 0, int code = 0, bool down = false, bool positioned = false, double dx=0,double dy=0)
     {
-        if (RemoteControlEnabled && !inputSuspended && Frame != null) InputCommand?.Execute(new RemoteInput(Frame.Identity, kind, x, y, code, down,positioned,dx,dy));
+        if (RemoteControlEnabled && !inputSuspended && (RemoteInputActive || kind == 1 && down) && Frame != null) InputCommand?.Execute(new RemoteInput(Frame.Identity, kind, x, y, code, down,positioned,dx,dy));
     }
     private bool Position(Point position, out double x, out double y)
     {
@@ -87,7 +89,7 @@ public sealed class NativeVideoView : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (!RemoteControlEnabled || inputSuspended || Environment.TickCount64 - lastMove < (OperatingSystem.IsLinux()?16:8) || !Position(e.GetPosition(this), out var x, out var y)) return;
+        if (!RemoteControlEnabled || !RemoteInputActive || inputSuspended || Environment.TickCount64 - lastMove < (OperatingSystem.IsLinux()?16:8) || !Position(e.GetPosition(this), out var x, out var y)) return;
         if (OperatingSystem.IsLinux())
         {
             // VM mouse integration can echo an absolute warp back to the viewer.

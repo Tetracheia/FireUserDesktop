@@ -80,7 +80,7 @@ internal sealed class RemoteKeyboardCapture : IDisposable
         if(Volatile.Read(ref disposed)!=0)return;
         var vm=window.DataContext as WorkspaceViewModel;
         var handle=window.TryGetPlatformHandle();
-        var enabled=window.IsActive && vm?.ControlledScreen is not null && handle?.Handle!=IntPtr.Zero;
+        var enabled=window.IsActive && window.RemoteVideoHasFocus && vm?.ControlledScreen is not null && handle?.Handle!=IntPtr.Zero;
         Route? next=null;
         lock(routeLock)
         {

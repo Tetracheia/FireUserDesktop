@@ -1,0 +1,49 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="using:UserIdentityDesktop.Views">
+  <Styles.Resources>
+    <!-- Keep Avalonia's calendar parts and input behavior; use the Angular picker palette and rounded day cells. -->
+    <ControlTheme x:Key="FireCalendarTheme" TargetType="Calendar" BasedOn="{StaticResource {x:Type Calendar}}">
+      <Setter Property="FontFamily" Value="fonts:Outfit#Outfit"/>
+      <Setter Property="Background" Value="{DynamicResource ForgeSurfaceCard}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ForgeTextPrimary}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ForgeBorder}"/>
+      <Setter Property="CornerRadius" Value="14"/>
+      <Setter Property="Template"><ControlTemplate>
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="{TemplateBinding CornerRadius}" Padding="14" BoxShadow="0 12 32 0 #28000000">
+          <StackPanel x:Name="PART_Root"><CalendarItem x:Name="PART_CalendarItem" Background="Transparent" Foreground="{TemplateBinding Foreground}" BorderThickness="0" BorderBrush="Transparent" CornerRadius="10"/></StackPanel>
+        </Border>
+      </ControlTemplate></Setter>
+    </ControlTheme>
+    <ControlTheme x:Key="FireCalendarDayTheme" TargetType="CalendarDayButton" BasedOn="{StaticResource {x:Type CalendarDayButton}}">
+      <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource ForgeTextPrimary}"/><Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="FontSize" Value="13"/><Setter Property="MinWidth" Value="40"/><Setter Property="MinHeight" Value="40"/><Setter Property="Margin" Value="1"/>
+      <Setter Property="Template"><ControlTemplate><Panel>
+        <Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="8"><ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+        <Border x:Name="Border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8" IsHitTestVisible="False"/>
+      </Panel></ControlTemplate></Setter>
+      <Style Selector="^:inactive /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource ForgeTextMuted}"/></Style>
+      <Style Selector="^:pointerover /template/ Border#Root"><Setter Property="Background" Value="{DynamicResource ForgePrimaryGradientSubtle}"/></Style>
+      <Style Selector="^:pointerover /template/ Border#Border"><Setter Property="BorderBrush" Value="{DynamicResource ForgePrimary}"/></Style>
+      <Style Selector="^:today /template/ Border#Root"><Setter Property="Background" Value="{DynamicResource ForgePrimaryGradientSubtle}"/></Style>
+      <Style Selector="^:today /template/ Border#Border"><Setter Property="BorderBrush" Value="{DynamicResource ForgePrimary}"/></Style>
+      <Style Selector="^:today /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource ForgeTextPrimary}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+      <Style Selector="^:selected /template/ Border#Root"><Setter Property="Background" Value="{DynamicResource ForgeActionGradient}"/></Style>
+      <Style Selector="^:selected /template/ Border#Border"><Setter Property="BorderBrush" Value="{DynamicResource ForgePrimary}"/></Style>
+      <Style Selector="^:selected /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource ForgeOnPrimary}"/><Setter Property="FontWeight" Value="Bold"/></Style>
+      <Style Selector="^:dayfocused /template/ Border#Border"><Setter Property="BorderBrush" Value="{DynamicResource ForgePrimary}"/><Setter Property="BorderThickness" Value="2"/></Style>
+      <Style Selector="^:focus-visible /template/ Border#Border"><Setter Property="BorderBrush" Value="{DynamicResource ForgePrimary}"/><Setter Property="BorderThickness" Value="2"/></Style>
+    </ControlTheme>
+  </Styles.Resources>
+  <Style Selector="CalendarDatePicker /template/ Calendar#PART_Calendar"><Setter Property="Theme" Value="{StaticResource FireCalendarTheme}"/></Style>
+  <Style Selector="CalendarDayButton"><Setter Property="Theme" Value="{StaticResource FireCalendarDayTheme}"/></Style>
+  <Style Selector="CalendarItem"><Setter Property="DayTitleTemplate"><Template x:DataType="x:String"><TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource ForgeTextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Template></Setter></Style>
+  <Style Selector="CalendarButton"><Setter Property="views:DesktopIconography.Enabled" Value="False"/><Setter Property="Foreground" Value="{DynamicResource ForgeTextPrimary}"/><Setter Property="Background" Value="Transparent"/><Setter Property="CornerRadius" Value="8"/></Style>
+  <Style Selector="CalendarItem /template/ Button#PART_HeaderButton"><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="{DynamicResource ForgeTextPrimary}"/></Style>
+  <Style Selector="CalendarItem /template/ Button#PART_PreviousButton, CalendarItem /template/ Button#PART_NextButton"><Setter Property="Background" Value="{DynamicResource ForgePrimaryGradientSubtle}"/><Setter Property="Foreground" Value="{DynamicResource ForgeTextPrimary}"/></Style>
+  <Style Selector="CalendarDatePicker /template/ Button#PART_Button"><Setter Property="Foreground" Value="{DynamicResource ForgePrimary}"/><Setter Property="Width" Value="36"/><Setter Property="Height" Value="36"/><Setter Property="AutomationProperties.Name" Value="Open calendar"/></Style>
+  <Style Selector="CalendarDatePicker:focus-within /template/ Border#Background"><Setter Property="Background" Value="{DynamicResource ForgeBgSecondary}"/><Setter Property="BorderBrush" Value="{DynamicResource ForgePrimary}"/><Setter Property="BorderThickness" Value="2"/></Style>
+  <Style Selector="CalendarDatePicker:pointerover /template/ Border#Background"><Setter Property="Background" Value="{DynamicResource ForgeSurfaceHover}"/><Setter Property="BorderBrush" Value="{DynamicResource ForgePrimary}"/></Style>
+  <Style Selector="CalendarItem /template/ Button"><Setter Property="views:DesktopIconography.Enabled" Value="False"/></Style>
+  <Style Selector="CalendarItem /template/ Button#PART_PreviousButton > Path"><Setter Property="RenderTransform"><RotateTransform Angle="-90"/></Setter><Setter Property="RenderTransformOrigin" Value="50%,50%"/><Setter Property="Stroke" Value="{DynamicResource ForgeTextPrimary}"/></Style>
+  <Style Selector="CalendarItem /template/ Button#PART_NextButton > Path"><Setter Property="RenderTransform"><RotateTransform Angle="-90"/></Setter><Setter Property="RenderTransformOrigin" Value="50%,50%"/><Setter Property="Stroke" Value="{DynamicResource ForgeTextPrimary}"/></Style>
+  <Style Selector="CalendarDatePicker"><Setter Property="IsTodayHighlighted" Value="True"/><Setter Property="TextConverter" Value="{StaticResource CalendarDisplayDateConverter}"/></Style>
+</Styles>

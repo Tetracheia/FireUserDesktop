@@ -1,4 +1,5 @@
 using System;
+using Avalonia;
 using System.ComponentModel;
 using System.Collections.Generic;
 using System.Linq;
@@ -38,10 +39,11 @@ public partial class CallWindow : Window
         var entryMotion = new SurfaceMotion();
         Opened += (_, _) => { if (Content is Control surface) _ = entryMotion.EnterAsync(surface, SurfaceMotion.Reduced(this), SurfaceMotionKind.Popup); };
         Closed += (_, _) => entryMotion.Cancel();
-        SizeChanged += (_, _) => UpdateGalleryLayout();
+        PropertyChanged += (_, e) => { if (e.Property == MotionPreferences.ReducedProperty && MotionPreferences.GetReduced(this)) entryMotion.Cancel(); };
+        SizeChanged += (_, _) => { UpdateGalleryLayout(); FullscreenToolbarScroll.MaxHeight = Math.Max(76, Bounds.Height * .4); };
         AddHandler(KeyDownEvent, PresentationKeyDown, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent,(_,e)=>RouteControlKey(e,false),RoutingStrategies.Tunnel);
-        AddHandler(TextInputEvent,(_,e)=>{if(IsActive&&observedModel?.ControlledScreen!=null)e.Handled=true;},RoutingStrategies.Tunnel);
+        AddHandler(TextInputEvent,(_,e)=>{if(IsActive&&observedModel?.ControlledScreen!=null&&RemoteVideoHasFocus)e.Handled=true;},RoutingStrategies.Tunnel);
         AddHandler(PointerPressedEvent,RouteControlPointer,RoutingStrategies.Tunnel);
         AddHandler(PointerReleasedEvent,RouteControlPointer,RoutingStrategies.Tunnel);
         AddHandler(PointerMovedEvent,RouteControlPointer,RoutingStrategies.Tunnel);
@@ -50,9 +52,9 @@ public partial class CallWindow : Window
         {
             controlRequestToast?.Close(); controlRequestToast = null;
             ExitShareFullscreen();
-            if (observedModel != null) { observedModel.PropertyChanged -= OnPresentationChanged; observedModel.ChooseScreenShareSourceAsync = null; }
+            if (observedModel != null) { observedModel.PropertyChanged -= OnPresentationChanged; observedModel.Chat.RequestScrollToBottom -= ScrollCallChat; observedModel.ChooseScreenShareSourceAsync = null; }
             observedModel = DataContext as WorkspaceViewModel;
-            if (observedModel != null) { observedModel.PropertyChanged += OnPresentationChanged; observedModel.ChooseScreenShareSourceAsync = ChooseScreenShareSource; }
+            if (observedModel != null) { observedModel.PropertyChanged += OnPresentationChanged; observedModel.Chat.RequestScrollToBottom += ScrollCallChat; observedModel.ChooseScreenShareSourceAsync = ChooseScreenShareSource; }
             UpdateGalleryLayout();
         };
         PropertyChanged += (_, e) =>
@@ -68,7 +70,7 @@ public partial class CallWindow : Window
                 if (presentationFullscreen && WindowState != (OperatingSystem.IsLinux()?WindowState.Normal:WindowState.FullScreen)) ExitShareFullscreen(restoreWindowState: false);
             });
         };
-        Closed += (_, _) => { controlRequestToast?.Close(); controlRequestToast = null; if (observedModel != null) { observedModel.PropertyChanged -= OnPresentationChanged; observedModel.ChooseScreenShareSourceAsync = null; } };
+        Closed += (_, _) => { controlRequestToast?.Close(); controlRequestToast = null; if (observedModel != null) { observedModel.PropertyChanged -= OnPresentationChanged; observedModel.Chat.RequestScrollToBottom -= ScrollCallChat; observedModel.ChooseScreenShareSourceAsync = null; } };
         Closing += async (_, args) =>
         {
             if (args.CloseReason is WindowCloseReason.OSShutdown or WindowCloseReason.ApplicationShutdown or WindowCloseReason.OwnerWindowClosing) return;
@@ -101,18 +103,17 @@ public partial class CallWindow : Window
     private void ToggleShareFullscreen()
     {
         if (presentationFullscreen) { ExitShareFullscreen(); return; }
-        if (DataContext is not WorkspaceViewModel { HasFocusedScreen: true } vm) return;
+        if (DataContext is not WorkspaceViewModel vm) return;
         previousWindowState = WindowState; previousMembers = vm.ShowCallMembers; previousChat = vm.ShowCallChat;
         vm.ShowCallMembers = vm.ShowCallChat = false;
         presentationFullscreen = true; Classes.Add("share-fullscreen");
         if(OperatingSystem.IsLinux())borderlessPresentation.Enter();
         else WindowState = WindowState.FullScreen;
-        SetFullscreenControls(false);
     }
     private void ExitShareFullscreen(bool restoreWindowState = true)
     {
         if (!presentationFullscreen) return;
-        presentationFullscreen = false;controlFullscreen = false; Classes.Remove("share-fullscreen");SetFullscreenControls(false);
+        presentationFullscreen = false;controlFullscreen = false; Classes.Remove("share-fullscreen");
         if(OperatingSystem.IsLinux())borderlessPresentation.Exit(restoreWindowState);
         else if(restoreWindowState)WindowState=previousWindowState;
         if (observedModel != null) { observedModel.ShowCallMembers = previousMembers; observedModel.ShowCallChat = previousChat; }
@@ -126,16 +127,17 @@ public partial class CallWindow : Window
                 foreach(var view in this.GetVisualDescendants().OfType<NativeVideoView>())view.SuspendRemoteInput();
                 observedModel.PauseRemoteInput();ExitShareFullscreen();e.Handled=true;return;
             }
-            RouteControlKey(e,true);return;
+            if (RemoteVideoHasFocus) { RouteControlKey(e,true); return; }
         }
         if (e.KeyModifiers != KeyModifiers.None) return;
         if (e.Key == Key.Escape && presentationFullscreen) { ExitShareFullscreen(); e.Handled = true; }
-        else if (e.Key == Key.F11 && (presentationFullscreen || observedModel?.HasFocusedScreen == true)) { ToggleShareFullscreen(); e.Handled = true; }
+        else if (e.Key == Key.F11 && (presentationFullscreen || observedModel != null)) { ToggleShareFullscreen(); e.Handled = true; }
     }
+    internal bool RemoteVideoHasFocus => observedModel?.ControlledScreen?.InputActive == true && ControlledView()?.IsKeyboardFocusWithin == true;
     private NativeVideoView? ControlledView()=>FocusedStage.GetVisualDescendants().OfType<NativeVideoView>().FirstOrDefault(x=>x.RemoteControlEnabled);
     private void RouteControlKey(KeyEventArgs e,bool down)
     {
-        if(!IsActive || observedModel?.ControlledScreen==null)return;
+        if(!IsActive || observedModel?.ControlledScreen==null || !RemoteVideoHasFocus)return;
         if(keyboardCapture?.Capturing!=true)ControlledView()?.ForwardKeyEvent(e,down);
         e.Handled=true;
     }
@@ -147,6 +149,9 @@ public partial class CallWindow : Window
             if(e is PointerPressedEventArgs){observedModel.PauseRemoteInput();ExitShareFullscreen();}
             e.Handled=true;return;
         }
+        // Local call controls must never become remote desktop clicks.
+        if (e.Source is not Visual sourceVisual ||
+            !(ReferenceEquals(sourceVisual, FocusedStage) || sourceVisual.GetVisualAncestors().Contains(FocusedStage))) return;
         ControlledView()?.ForwardPointer(e);
         e.Handled=true;
     }
@@ -168,9 +173,8 @@ public partial class CallWindow : Window
         {
             if (observedModel?.ControlledScreen is {} controlled)
             {
-                observedModel.FocusedVideo = controlled;
-                if (!presentationFullscreen) ToggleShareFullscreen();
-                controlFullscreen = true;
+                if (!presentationFullscreen && controlled.InputActive) ToggleShareFullscreen();
+                controlFullscreen = presentationFullscreen;
                 Dispatcher.UIThread.Post(() =>
                 {
                     if (observedModel?.ControlledScreen != controlled || !controlled.CanControl) return;
@@ -178,16 +182,17 @@ public partial class CallWindow : Window
                     FocusedStage.GetVisualDescendants().OfType<NativeVideoView>().FirstOrDefault()?.Focus();
                 }, DispatcherPriority.Loaded);
             }
-            else if (controlFullscreen) ExitShareFullscreen();
+            else if (controlFullscreen && (observedModel?.HasRemoteControl != true || !observedModel.Videos.Any(x => x.CanControl))) ExitShareFullscreen();
         }
+        if(e.PropertyName==nameof(WorkspaceViewModel.ShowCallChat) && observedModel?.ShowCallChat==true)ScrollCallChat();
         if (e.PropertyName is nameof(WorkspaceViewModel.ParticipantSummary) or nameof(WorkspaceViewModel.ShowCallMembers) or nameof(WorkspaceViewModel.ShowCallChat) or nameof(WorkspaceViewModel.HasFocusedVideo)) UpdateGalleryLayout();
-        if (e.PropertyName == nameof(WorkspaceViewModel.ControlRequester) && presentationFullscreen) SetFullscreenControls(observedModel?.ControlRequester != null);
-        if (e.PropertyName == nameof(WorkspaceViewModel.HasFocusedScreen) && observedModel?.HasFocusedScreen != true) ExitShareFullscreen();
+
     }
     private void UpdateGalleryLayout()
     {
         if (observedModel == null) return;
-        var available = (Bounds.Width > 0 ? Bounds.Width : Width) - 40 - (observedModel.ShowCallMembers ? 266 : 0) - (observedModel.ShowCallChat ? 318 : 0);
+        if (presentationFullscreen && Bounds.Width < 1100 && observedModel.ShowCallChat && observedModel.ShowCallMembers) observedModel.ShowCallMembers = false;
+        var available = (Bounds.Width > 0 ? Bounds.Width : Width) - 40 - (observedModel.ShowCallMembers ? 266 : 0) - (observedModel.ShowCallChat ? 378 : 0);
         observedModel.GalleryColumns = observedModel.HasFocusedVideo ? 1 : Math.Max(1, Math.Min(Math.Max(1, observedModel.Videos.Count), Math.Min(3, (int)(available / 380))));
     }
     private void FocusedTile_ContextRequested(object? sender, ContextRequestedEventArgs e)
@@ -212,11 +217,10 @@ public partial class CallWindow : Window
         menu.Items.Add(new MenuItem { Header = "Return to gallery", Command = observedModel.ClearVideoFocusCommand });
         MessageMenus.Open(target,menu,atPointer);
     }
-    private void CallMessage_ContextRequested(object? sender, ContextRequestedEventArgs e)
+    private void ScrollCallChat() => Dispatcher.UIThread.Post(() =>
     {
-        if (observedModel != null && sender is Control { DataContext: ChatMessageItemViewModel message } target)
-        { MessageMenus.Open(target,MessageMenus.Create(observedModel.Chat,message,target),true); e.Handled = true; }
-    }
+        if(IsVisible && observedModel?.ShowCallChat==true && CallMessageStream.ItemCount>0)CallMessageStream.ScrollIntoView(CallMessageStream.ItemCount-1);
+    },DispatcherPriority.Background);
     private void Tile_Pressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
         if (e.Source is Control origin && (origin is Button || origin.FindAncestorOfType<Button>() != null)) return;
@@ -228,25 +232,27 @@ public partial class CallWindow : Window
         if (e.Source is Control origin && (origin is Button || origin.FindAncestorOfType<Button>() != null)) return;
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) observedModel.FocusVideoCommand.Execute(tile);
     }
-    private void SetFullscreenControls(bool show)
+    private void FullscreenDevices_Click(object? sender, RoutedEventArgs e)
     {
-        show = show || presentationFullscreen && observedModel?.ControlRequester != null;
-        FullscreenToolbar.Opacity = show ? 1 : 0;
-        FullscreenToolbar.IsHitTestVisible = show;
+        Devices_Click(sender, e);
+        if (sender is Control target) CallDevicesButton.Flyout?.ShowAt(target);
     }
-    private void FullscreenControls_Entered(object? sender, PointerEventArgs e) => SetFullscreenControls(true);
-    private void FullscreenControls_Exited(object? sender, PointerEventArgs e) { if (!FullscreenControls.IsKeyboardFocusWithin) SetFullscreenControls(false); }
-    private void FullscreenControls_Focused(object? sender, RoutedEventArgs e) => SetFullscreenControls(true);
-    private void FullscreenControls_Blurred(object? sender, RoutedEventArgs e) => Dispatcher.UIThread.Post(() => { if (!FullscreenControls.IsKeyboardFocusWithin && !FullscreenControls.IsPointerOver) SetFullscreenControls(false); });
+    private void FullscreenChat_Click(object? sender, RoutedEventArgs e)
+    {
+        if (observedModel is not {} vm) return;
+        vm.ShowCallChat = !vm.ShowCallChat;
+        if (vm.ShowCallChat && Bounds.Width < 1100) vm.ShowCallMembers = false;
+    }
+    private void FullscreenMembers_Click(object? sender, RoutedEventArgs e)
+    {
+        if (observedModel is not {} vm) return;
+        vm.ShowCallMembers = !vm.ShowCallMembers;
+        if (vm.ShowCallMembers && Bounds.Width < 1100) vm.ShowCallChat = false;
+    }
     private void RequestFocusedControl_Click(object? sender, RoutedEventArgs e)
     {
         if (observedModel?.FocusedVideo is not {IsScreen:true} tile) return;
         if (observedModel.CanRequestScreenControl(tile)) observedModel.RequestScreenControlCommand.Execute(tile);
-    }
-    private void OpenPanelsFromFullscreen_Click(object? sender, RoutedEventArgs e)
-    {
-        ExitShareFullscreen();
-        if (observedModel != null) observedModel.ShowCallMembers = observedModel.ShowCallChat = true;
     }
     private void Devices_Click(object? sender, RoutedEventArgs e)
     {

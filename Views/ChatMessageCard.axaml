@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:UserIdentityDesktop.ViewModels" xmlns:views="using:UserIdentityDesktop.Views"
+ x:Class="UserIdentityDesktop.Views.ChatMessageCard" x:Name="RootMessageCard" x:DataType="vm:ChatMessageItemViewModel">
+  <UserControl.Styles>
+    <Style Selector="Grid.msg-row.mine"><Setter Property="HorizontalAlignment" Value="Right" /></Style>
+    <Style Selector="Grid.msg-row.theirs"><Setter Property="HorizontalAlignment" Value="Left" /></Style>
+    <Style Selector="Grid.msg-row.call"><Setter Property="HorizontalAlignment" Value="Center" /></Style>
+    <Style Selector="Border.msg-bubble"><Setter Property="Background" Value="{DynamicResource ForgeBubbleReceived}" /><Setter Property="BorderBrush" Value="{DynamicResource ForgeBorder}" /><Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="16,16,16,4" /><Setter Property="Padding" Value="12,9" /><Setter Property="HorizontalAlignment" Value="Left" /></Style>
+    <Style Selector="Border.msg-bubble.mine"><Setter Property="Background" Value="{DynamicResource ForgePrimaryGradient}" /><Setter Property="BorderBrush" Value="{DynamicResource ForgeBubbleSentBorder}" /><Setter Property="CornerRadius" Value="16,16,4,16" /><Setter Property="BoxShadow" Value="0 4 14 0 #4DFF4500" /><Setter Property="HorizontalAlignment" Value="Right" /></Style>
+    <Style Selector="Border.msg-bubble.mine TextBlock"><Setter Property="Foreground" Value="White" /></Style>
+    <Style Selector="Border.msg-bubble.mine TextBlock.caption"><Setter Property="Foreground" Value="#D9FFFFFF" /></Style>
+    <Style Selector="Button.message-more"><Setter Property="Opacity" Value="0.15" /><Setter Property="Width" Value="28" /><Setter Property="Height" Value="28" /><Setter Property="Padding" Value="6" /><Setter Property="Margin" Value="4,3" /></Style>
+    <Style Selector="Grid.msg-row:pointerover Button.message-more, Button.message-more:focus"><Setter Property="Opacity" Value="1" /></Style>
+  </UserControl.Styles>
+                <Grid Classes="msg-row" Classes.mine="{Binding IsMine}" Classes.theirs="{Binding !IsMine}" Classes.call="{Binding IsCall}" ColumnDefinitions="*,Auto" Margin="0,5" MaxWidth="560" ContextRequested="Message_ContextRequested">
+                  <StackPanel Spacing="6" IsVisible="{Binding !IsCall}">
+                    <TextBlock Text="{Binding #RootMessageCard.SenderLabel}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource ForgeTextSecondary}" TextTrimming="CharacterEllipsis" AutomationProperties.Name="Message sender"/>
+                    <views:AttachmentBundle Message="{Binding}" IsVisible="{Binding HasAttachments}" />
+                    <Border Classes="msg-bubble" Classes.mine="{Binding IsMine}" IsVisible="{Binding HasBubble}">
+                      <StackPanel Spacing="6">
+                      <Border BorderBrush="{DynamicResource ForgePrimary}" BorderThickness="2,0,0,0" Padding="9,3" IsVisible="{Binding HasReply}"><TextBlock Text="{Binding ReplyLabel}" FontSize="11" Foreground="{DynamicResource ForgeTextSecondary}" /></Border>
+                      <TextBlock Text="{Binding Text}" FontFamily="fonts:Outfit#Outfit, Noto Color Emoji, Segoe UI Emoji, Apple Color Emoji" FontSize="14" TextWrapping="Wrap" LineHeight="21" IsVisible="{Binding HasText}" />
+                      </StackPanel>
+                    </Border>
+                      <TextBlock Text="{Binding AttachmentError}" Foreground="{DynamicResource ForgeDanger}" TextWrapping="Wrap" IsVisible="{Binding AttachmentError, Converter={StaticResource NullToBoolConverter}}" />
+                      <TextBlock Text="{Binding ReactionLabel}" IsVisible="{Binding HasReactions}" FontSize="15" FontFamily="Noto Color Emoji, Segoe UI Emoji, Apple Color Emoji" Margin="0,3" />
+                      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"><TextBlock Text="Edited" IsVisible="{Binding Edited}" Classes="caption" /><TextBlock Classes="caption" AutomationProperties.Name="Message sent at"><TextBlock.Text><MultiBinding Converter="{StaticResource DateTimeFormatConverter}" ConverterParameter="message"><Binding Path="TimeSent"/><Binding Source="{x:Static vm:ClockDisplaySettings.Shared}" Path="TwelveHour" x:DataType="vm:ClockDisplaySettings"/></MultiBinding></TextBlock.Text></TextBlock><Grid Width="18" Height="14" IsVisible="{Binding IsMine}" ToolTip.Tip="{Binding ReceiptLabel}" AutomationProperties.Name="{Binding ReceiptLabel}"><Path Stroke="{DynamicResource ForgeTextSecondary}" StrokeThickness="1.5" Data="M2,7 L6,11 14,3" IsVisible="{Binding !Seen}" /><Path Stroke="{DynamicResource ForgePrimary}" StrokeThickness="1.5" Data="M1,7 L5,11 13,3 M7,10 L9,12 17,4" IsVisible="{Binding Seen}" /></Grid></StackPanel>
+                  </StackPanel>
+                  <Border IsVisible="{Binding IsCall}" Background="{DynamicResource ForgeSurfaceCard}" BorderBrush="{DynamicResource ForgeBorder}" BorderThickness="1" CornerRadius="14" Padding="18,14" MinWidth="240">
+                    <StackPanel Spacing="6"><TextBlock Text="{Binding #RootMessageCard.SenderLabel}" Classes="caption"/><Grid ColumnDefinitions="Auto,*"><Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource ForgePrimaryGradientSubtle}"><PathIcon Data="{StaticResource Glyph.Phone}" Width="18" Height="18" Foreground="{DynamicResource ForgePrimary}" /></Border><StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="7"><TextBlock Text="{Binding CallLabel}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Classes="caption" AutomationProperties.Name="Message sent at"><TextBlock.Text><MultiBinding Converter="{StaticResource DateTimeFormatConverter}" ConverterParameter="message"><Binding Path="TimeSent"/><Binding Source="{x:Static vm:ClockDisplaySettings.Shared}" Path="TwelveHour" x:DataType="vm:ClockDisplaySettings"/></MultiBinding></TextBlock.Text></TextBlock><Button Content="Join call" Classes="fire-btn" IsVisible="{Binding CanJoinCall}" Click="JoinCall_Click" /></StackPanel></Grid></StackPanel>
+                  </Border>
+                  <Button Grid.Column="1" Classes="quiet message-more" VerticalAlignment="Top" Click="MessageMenu_Click" AutomationProperties.Name="Message actions"><PathIcon Data="{StaticResource Glyph.More}" Width="16" Height="16" /></Button>
+                </Grid>
+</UserControl>

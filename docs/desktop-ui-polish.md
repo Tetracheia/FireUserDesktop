@@ -54,3 +54,5 @@ Regression evidence in `CollaborationParityTests`:
 - `SnapshotCanceledByDisposal_DoesNotBecomeAnErrorOrRetry` verifies shutdown cancellation finishes without an error or another snapshot.
 
 The backend's existing repetitive-traffic lock applies to an endpoint, including requests from other clients. After installing the fix, stop any older desktop instance and allow an existing lock to expire according to the server's `Retry-After` header (the supported repetition lock is 120 or 180 seconds). No rate-limit settings or server state were changed. A debugger's first-chance `TaskCanceledException` alone does not establish a crash; cancelled UI transitions and shutdown requests may be handled normally, and exit code 0 indicates a successful process exit.
+
+For the current submission forms, fiery native calendar popup, keyboard focus and motion behavior, see [submission forms and calendar picker](submission-forms-and-calendar-picker.md). For fullscreen calling and per-device remote-control approvals, see [fullscreen calls and control](fullscreen-calls-and-control.md).

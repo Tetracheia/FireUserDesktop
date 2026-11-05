@@ -7,6 +7,6 @@
         <ContentControl Grid.Column="1" Content="{Binding Chat}" IsVisible="{Binding IsChatView}" Width="430" HorizontalAlignment="Center"><ContentControl.ContentTemplate><DataTemplate x:DataType="vm:ChatViewModel"><views:PeopleSearchBox/></DataTemplate></ContentControl.ContentTemplate></ContentControl>
       </Grid>
     </Border>
-    <ContentControl Grid.Row="1" Content="{Binding CurrentView}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+    <ContentControl x:Name="ShellContent" views:ContentMotion.Enabled="True" Grid.Row="1" Content="{Binding CurrentView}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
   </Grid>
 </Window>
