@@ -1,0 +1,17 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="using:UserIdentityDesktop.Views">
+  <!-- Branded Avalonia controls retain native windowing, file dialogs and keyboard conventions. -->
+  <Style Selector="Window"><Setter Property="views:AdaptivePresentation.Enabled" Value="True" /><Setter Property="FontSize" Value="14" /></Style>
+  <Style Selector="TextBlock.caption"><Setter Property="FontSize" Value="12" /><Setter Property="LineHeight" Value="18" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
+  <Style Selector="TextBlock.section-label"><Setter Property="FontSize" Value="12" /></Style>
+  <Style Selector="TextBox, ComboBox, CalendarDatePicker"><Setter Property="MinHeight" Value="40" /></Style>
+  <Style Selector="Button:not(.workspace-nav):not(.fire-toast-action)"><Setter Property="MinHeight" Value="38" /></Style>
+  <Style Selector="Button.square"><Setter Property="Width" Value="40" /><Setter Property="Height" Value="40" /><Setter Property="Padding" Value="10" /></Style>
+  <Style Selector="Button, ComboBox, CheckBox, RadioButton, TabItem, ListBoxItem">
+    <Setter Property="FocusAdorner"><FocusAdornerTemplate><Border BorderBrush="{DynamicResource ForgeTextPrimary}" BorderThickness="2" CornerRadius="8" IsHitTestVisible="False" /></FocusAdornerTemplate></Setter>
+  </Style>
+  <Style Selector="Window.compact-window Border.forge-card, Window.compact-window Border.workspace-panel"><Setter Property="Padding" Value="16" /></Style>
+  <Style Selector="ContentControl.header-search"><Setter Property="Width" Value="430" /></Style>
+  <Style Selector="Window.compact-window ContentControl.header-search"><Setter Property="Width" Value="280" /></Style>
+  <Style Selector="Window.compact-window TextBlock.forge-heading"><Setter Property="FontSize" Value="22" /></Style>
+  <Style Selector="TextBox:disabled, ComboBox:disabled"><Setter Property="Opacity" Value="0.65" /></Style>
+</Styles>

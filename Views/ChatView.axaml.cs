@@ -112,6 +112,7 @@ public partial class ChatView : UserControl
     {
         InitializeComponent();
         MessageInputBox.PastingFromClipboard += PasteAttachments;
+        SizeChanged += (_,e) => ChatLayout.ColumnDefinitions[0].Width = new GridLength(e.NewSize.Width<980?248:e.NewSize.Width>=1500?336:300);
 
         DataContextChanged += OnDataContextChanged;
         PointerMoved += (_, _) =>

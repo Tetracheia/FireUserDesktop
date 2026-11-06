@@ -18,7 +18,7 @@ using UserIdentityDesktop.Views;
 using Xunit;
 namespace UserIdentityDesktop.Tests;
 
-public sealed class ChatPresentationTests
+public sealed partial class ChatPresentationTests
 {
     private static (WorkspaceViewModel Vm, IChatService Service) Model()
     {
