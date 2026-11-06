@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Platform.Storage;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
@@ -38,6 +40,58 @@ public sealed class ChatPresentationTests
         }
         return (workspace,service);
     }
+    [AvaloniaFact]
+    public async Task ConversationSnapshotsSortNewestFirstAndKeepSelectionDuringReordering()
+    {
+        var (workspace,service)=Model(); var chat=workspace.Chat;
+        foreach(var item in chat.Recipients)item.LastSent=new DateTime(2025,1,1);
+        var selected=chat.SelectedRecipient!;
+        var oldest=chat.Recipients[1];var newest=chat.Recipients[2];
+        oldest.LastSent=new DateTime(2026,1,1); selected.LastSent=new DateTime(2026,2,1); newest.LastSent=new DateTime(2026,3,1);
+        chat.SearchText=" "; Dispatcher.UIThread.RunJobs();
+        Assert.Same(newest,chat.FilteredRecipients[0]);Assert.Same(oldest,chat.FilteredRecipients[2]);Assert.Same(selected,chat.SelectedRecipient);
+        service.GetRecipientsAsync().Returns(new List<RecipientDto> {new(){ReceiverId=oldest.ReceiverId,ReceiverName=oldest.ReceiverName,LastSent=new DateTime(2026,4,1),LastMessage="Latest"}});
+        await chat.LoadRecipientsAsync();Dispatcher.UIThread.RunJobs();
+        Assert.Same(oldest,chat.FilteredRecipients[0]);Assert.Same(selected,chat.SelectedRecipient);
+        await workspace.DisposeAsync();
+    }
+
+    [AvaloniaFact]
+    public async Task ComposerPasteStagesWholeFilesAndTextRemainsEditable()
+    {
+        var (workspace,_)=Model();var view=new ChatView{DataContext=workspace.Chat};var owner=new Window{Content=view};owner.Show();Dispatcher.UIThread.RunJobs();
+        var path=System.IO.Path.GetTempFileName();await System.IO.File.WriteAllTextAsync(path,"Complete attachment contents");
+        try
+        {
+            var file=await owner.StorageProvider.TryGetFileFromPathAsync(new Uri(path));Assert.NotNull(file);
+            await owner.Clipboard!.SetFilesAsync(new[]{file});
+            var input=view.FindControl<TextBox>("MessageInputBox")!;input.RaiseEvent(new RoutedEventArgs(TextBox.PastingFromClipboardEvent));
+            await Task.Yield();Dispatcher.UIThread.RunJobs();
+            var pending=Assert.Single(workspace.Chat.PendingAttachments);Assert.Equal(path,pending.FilePath);Assert.Equal("Complete attachment contents",await System.IO.File.ReadAllTextAsync(pending.FilePath));
+            workspace.Chat.RemovePendingAttachment(pending);Assert.True(System.IO.File.Exists(path));
+            input.Text="Hello world";input.SelectionStart=6;input.SelectionEnd=11;
+            await owner.Clipboard.SetTextAsync("team");input.RaiseEvent(new RoutedEventArgs(TextBox.PastingFromClipboardEvent));await Task.Yield();Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Hello team",input.Text);Assert.Empty(workspace.Chat.PendingAttachments);
+        }
+        finally {System.IO.File.Delete(path);owner.Close();await workspace.DisposeAsync();}
+    }
+
+    [AvaloniaFact]
+    public async Task PastedImageIsStagedAsACompletePngAndRemovedWithThePreview()
+    {
+        var (workspace,_)=Model();var view=new ChatView{DataContext=workspace.Chat};var owner=new Window{Content=view};owner.Show();Dispatcher.UIThread.RunJobs();
+        using var image=new WriteableBitmap(new PixelSize(4,3),new Vector(96,96));
+        try
+        {
+            await owner.Clipboard!.SetBitmapAsync(image);
+            view.FindControl<TextBox>("MessageInputBox")!.RaiseEvent(new RoutedEventArgs(TextBox.PastingFromClipboardEvent));await Task.Yield();Dispatcher.UIThread.RunJobs();
+            var attachment=Assert.Single(workspace.Chat.PendingAttachments);Assert.True(workspace.Chat.ShowSendAction);
+            using(var saved=new Bitmap(attachment.FilePath))Assert.Equal(new PixelSize(4,3),saved.PixelSize);
+            workspace.Chat.RemovePendingAttachment(attachment);Assert.False(System.IO.File.Exists(attachment.FilePath));Assert.Empty(workspace.Chat.PendingAttachments);
+        }
+        finally {owner.Close();await workspace.DisposeAsync();}
+    }
+
     [AvaloniaTheory]
     [InlineData(false)] [InlineData(true)]
     public async Task ChatPreview_UsesQuietMessagesAndNativeActionAccess(bool light)

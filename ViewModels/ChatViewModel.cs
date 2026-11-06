@@ -238,6 +238,8 @@ public partial class ChatViewModel : ViewModelBase
         _ = CancelVoiceRecording();
         foreach (var note in recordedNotes) _ = note.DisposeAsync();
         recordedNotes.Clear();
+        clipboardClosed = true;
+        CleanupClipboardFiles(all: true);
         _chatService.UserPresenceChanged -= OnUserPresenceChanged;
         _chatService.UserStatusChanged -= OnUserStatusChanged;
         _chatService.ConnectionStateChanged -= OnConnectionStateChanged;
@@ -305,7 +307,7 @@ public partial class ChatViewModel : ViewModelBase
             ? Recipients
             : Recipients.Where(r =>
                 r.ReceiverName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                (r.LastMessage != null && r.LastMessage.Contains(query, StringComparison.OrdinalIgnoreCase)))).ToList();
+                (r.LastMessage != null && r.LastMessage.Contains(query, StringComparison.OrdinalIgnoreCase)))).OrderByDescending(r => r.LastSent).ThenBy(r => r.ReceiverName, StringComparer.OrdinalIgnoreCase).ToList();
 
         _isRefreshingRecipientList = true;
         for (var index = FilteredRecipients.Count - 1; index >= 0; index--)
@@ -677,6 +679,7 @@ public partial class ChatViewModel : ViewModelBase
             IsSendingMessage = false;
             IsUploadingAttachments = false;
             await CleanupDetachedVoiceNotes();
+            CleanupClipboardFiles();
         }
     }
 
@@ -686,12 +689,20 @@ public partial class ChatViewModel : ViewModelBase
         if (VoiceComposerActive || IsSendingMessage) return;
         var picked = await _fileService.PickFilesAsync("Select files to attach", allowMultiple: true);
         if (VoiceComposerActive) return;
-        foreach (var file in picked)
+        AddPendingFiles(picked);
+    }
+
+    public void AddPendingFiles(IEnumerable<string> paths)
+    {
+        if (VoiceComposerActive || IsSendingMessage || EditingMessage != null || !CanTypeMessage) return;
+        foreach (var path in paths)
         {
-            if (!PendingAttachments.Any(p => p.FilePath == file))
-            {
-                PendingAttachments.Add(new PendingAttachmentViewModel(file, _imageService));
-            }
+            var files = System.IO.Directory.Exists(path)
+                ? System.IO.Directory.EnumerateFiles(path, "*", System.IO.SearchOption.AllDirectories)
+                : new[] { path };
+            foreach (var file in files.Where(System.IO.File.Exists))
+                if (!PendingAttachments.Any(p => p.FilePath == file))
+                    PendingAttachments.Add(new PendingAttachmentViewModel(file, _imageService));
         }
     }
 
@@ -699,6 +710,7 @@ public partial class ChatViewModel : ViewModelBase
     public void RemovePendingAttachment(PendingAttachmentViewModel item)
     {
         PendingAttachments.Remove(item);
+        CleanupClipboardFiles();
         _ = CleanupDetachedVoiceNotes();
     }
 
@@ -885,13 +897,7 @@ public partial class ChatViewModel : ViewModelBase
                 recipient.LastSent = message.TimeSent;
                 recipient.IsSeen = isCurrentChat || message.Sender == CurrentUser.Id;
 
-                // Move recipient to top
-                var idx = Recipients.IndexOf(recipient);
-                if (idx > 0)
-                {
-                    Recipients.Move(idx, 0);
-                    ApplyFilter();
-                }
+                ApplyFilter();
             }
             else
             {

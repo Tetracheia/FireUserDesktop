@@ -1,5 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia;
 using Avalonia.Animation;
@@ -109,6 +111,7 @@ public partial class ChatView : UserControl
     public ChatView()
     {
         InitializeComponent();
+        MessageInputBox.PastingFromClipboard += PasteAttachments;
 
         DataContextChanged += OnDataContextChanged;
         PointerMoved += (_, _) =>
@@ -117,6 +120,39 @@ public partial class ChatView : UserControl
                 chatVm.RecordActivity();
         };
 
+    }
+
+    private async void PasteAttachments(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (model is not {} current || !current.CanTypeMessage || current.IsSendingMessage || current.VoiceComposerActive) return;
+        var recipient = current.SelectedRecipient;
+        var start = MessageInputBox.SelectionStart;
+        var end = MessageInputBox.SelectionEnd;
+        var draft = MessageInputBox.Text;
+        if (TopLevel.GetTopLevel(this)?.Clipboard is not {} clipboard) return;
+        try
+        {
+            var files = await clipboard.TryGetFilesAsync();
+            if (model != current || current.SelectedRecipient != recipient) return;
+            var paths = files?.Select(file => file.TryGetLocalPath()).OfType<string>().ToArray() ?? Array.Empty<string>();
+            if (paths.Length > 0) { current.AddPendingFiles(paths); return; }
+            using var bitmap = await clipboard.TryGetBitmapAsync();
+            if (model != current || current.SelectedRecipient != recipient) return;
+            if (bitmap != null)
+            {
+                current.AddClipboardImage(bitmap);
+                return;
+            }
+            var text = await clipboard.TryGetTextAsync();
+            if (text != null && model == current && current.SelectedRecipient == recipient && MessageInputBox.Text == draft && current.CanTypeMessage)
+            {
+                MessageInputBox.SelectionStart = start;
+                MessageInputBox.SelectionEnd = end;
+                MessageInputBox.SelectedText = text;
+            }
+        }
+        catch { current.SendError = "Could not paste the attachment. Try selecting the file instead."; }
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)

@@ -45,3 +45,11 @@ Group read-receipt tasks are now observed. Intentional cancellation completes qu
 Regression evidence: BackendActionQueueTests.TransportCancellationIsReportedAsUncertainConnectionFailureWithoutReplay, BackendActionQueueTests.CallerCancellationRemainsCancellationAndDoesNotMarkTheConnectionOffline, ChatAttachmentParityTests.OpeningGroupChatObservesCancelledReadReceiptsAndReportsRealFailuresOnlyForActiveConversation. Focused result: 18 passed. The exact original request still requires the first Fire User file/line in the debugger Call Stack.
 
 Cancellation follow-up full regression: **245 passed, 4 skipped**, no failures (`/tmp/fire-chat-cancel-full.log`).
+
+## Clipboard composer and recent conversations
+
+The native message composer handles the operating system Paste action, including keyboard and context-menu paste. Clipboard files/folders enter the existing pending attachment tray; clipboard bitmaps become complete PNG attachments. Text replaces the current selection normally. Pasting never sends automatically. Clipboard-created PNGs are removed when their preview is removed, after sending, or at composer teardown; source documents are retained. An in-flight upload finishes before its temporary files are deleted.
+
+The visible conversation list sorts by `LastSent` descending after initial loading, refreshed snapshots, live messages and search changes. Equal timestamps use the conversation name for a stable ordering. Reordering retains the selected conversation.
+
+Regressions: `ConversationSnapshotsSortNewestFirstAndKeepSelectionDuringReordering`, `ComposerPasteStagesWholeFilesAndTextRemainsEditable`, and `PastedImageIsStagedAsACompletePngAndRemovedWithThePreview`. Verification ran on Linux with Avalonia headless tests. Native Windows/macOS clipboard behavior still needs target-platform checks.
