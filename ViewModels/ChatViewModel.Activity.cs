@@ -32,6 +32,8 @@ public partial class ChatViewModel
     public string VoiceStatusLabel => IsOpeningMicrophone ? "Opening microphone…" : IsPreparingVoice ? "Preparing audio…" : $"Recording {(int)voiceClock.Elapsed.TotalMinutes}:{voiceClock.Elapsed.Seconds:00}";
     internal Func<string, Task<VoiceNoteRecorder>> CreateVoiceRecorderAsync { get; set; } = microphone => Task.Run(() => new VoiceNoteRecorder(microphone));
     [ObservableProperty] private bool _isUploadingAttachments;
+    public string AttachmentSendingStage => _chatService.Transfers?.Snapshot().LastOrDefault(x => x.Direction == UserIdentityDesktop.Core.TransferDirection.Upload && x.Purpose == UserIdentityDesktop.Core.TransferPurpose.ChatAttachment && !x.Finished)?.Phase ?? "Uploading attachments…";
+    private void OnAttachmentTransferChanged() => Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(AttachmentSendingStage)));
     private static string UploadActivityKind(System.Collections.Generic.IReadOnlyList<string> files)
     {
         if (files.Count == 1 && System.IO.Path.GetFileName(files[0]).StartsWith("voice-note-", StringComparison.Ordinal)) return "voice";

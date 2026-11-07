@@ -22,6 +22,18 @@ public sealed class AttachmentTransferTests
         public void Advance(double seconds)=>now+=TimeSpan.FromSeconds(seconds);
     }
     [Fact]
+    public void ScanPhaseNotifiesUiWithoutMarkingTransferCompleteAndLatePhasesAreIgnored()
+    {
+        var tracker=new TransferTracker();using var transfer=tracker.Start(TransferDirection.Upload,1,2);
+        transfer.Report(2);var changes=0;tracker.Changed+=()=>changes++;
+        transfer.SetPhase("Scanning attachments for malware…");
+        var state=Assert.Single(tracker.Snapshot());
+        Assert.Equal("Scanning attachments for malware…",state.Phase);Assert.False(state.Finished);Assert.Equal(99,state.Percentage);Assert.Equal(1,changes);
+        transfer.SetPhase(state.Phase);Assert.Equal(1,changes);
+        transfer.Complete(true);transfer.SetPhase("Scanning attachments for malware…");
+        Assert.Equal("Completed",Assert.Single(tracker.Snapshot()).Phase);Assert.Equal(2,changes);
+    }
+    [Fact]
     public void RealBytesSpeedStallsAndServerConfirmationRemainDistinct()
     {
         var clock=new Clock();var tracker=new TransferTracker(clock);
@@ -170,6 +182,24 @@ public sealed class AttachmentTransferTests
         }
         finally {File.Delete(path);}
     }
+    [AvaloniaFact]
+    public void ScanningTransferShowsItsStageWithoutBytePercentageOrSpeedInBothThemes()
+    {
+        var previous=Avalonia.Application.Current!.RequestedThemeVariant;
+        try {
+            foreach(var theme in new[]{ThemeVariant.Light,ThemeVariant.Dark}) {
+                Avalonia.Application.Current.RequestedThemeVariant=theme;
+                var window=new TransferToastWindow(reducedMotion:true);window.Show();
+                try {
+                    window.Update([new(Guid.NewGuid(),TransferDirection.Upload,1,1,10,10,0,"Scanning attachments for malware…",false,false,null)]);
+                    var labels=window.GetVisualDescendants().OfType<TextBlock>().Where(x=>x.IsVisible).Select(x=>x.Text).ToArray();
+                    Assert.Contains("Scanning attachments for malware…",labels);Assert.DoesNotContain("99%",labels);
+                    Assert.DoesNotContain(labels,x=>x?.Contains("/s")==true);
+                }finally{window.CloseForPresenter();}
+            }
+        }finally{Avalonia.Application.Current.RequestedThemeVariant=previous;}
+    }
+
     [AvaloniaFact]
     public async Task TransferOutlivesOrdinarySixSecondLifetimeAndUnknownTotalsStayIndeterminate()
     {

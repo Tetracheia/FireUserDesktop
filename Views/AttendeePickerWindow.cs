@@ -27,11 +27,12 @@ internal sealed class AttendeePickerWindow : Window
     public AttendeePickerWindow(AttendeePickerViewModel model, bool reducedMotion = false)
     {
         this.reducedMotion = reducedMotion;
+        ComposeAppearance.Apply(this);
         Title = "Meeting attendees"; Width = 960; Height = 700; MinWidth = 560; MinHeight = 460;
         WindowStartupLocation = WindowStartupLocation.CenterOwner; DataContext = model;
         this.Bind(BackgroundProperty, this.GetResourceObservable("ForgeBg")); this.Bind(ForegroundProperty, this.GetResourceObservable("ForgeTextPrimary"));
         var content = new StackPanel { Spacing = 14, Margin = new Thickness(24) };
-        content.Children.Add(new TextBlock { Text = "Meeting attendees", FontSize = 24 });
+        content.Children.Add(new TextBlock { Text = "Meeting attendees", FontSize = 16.8, FontWeight = Avalonia.Media.FontWeight.Bold });
         var search = new TextBox { PlaceholderText = "Search employees by name" }; search.Bind(TextBox.TextProperty, new Binding(nameof(model.Search)) { Mode = BindingMode.TwoWay }); content.Children.Add(search);
         var panes = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") };
         panes.Children.Add(Pane("Search results", model.Results, model.SelectAllCommand, "Select all results"));
@@ -59,7 +60,7 @@ internal sealed class AttendeePickerWindow : Window
         Control Pane(string title, System.Collections.ObjectModel.ObservableCollection<PersonSelection> people, System.Windows.Input.ICommand all, string allText)
         {
             var stack = new StackPanel { Spacing = 8, Margin = new Thickness(8) };
-            stack.Children.Add(new TextBlock { Text = title, FontSize = 18 }); var bulk = new Button { Content = allText }; bulk.Click += (_, _) => TransferSelection(() => all.Execute(null)); stack.Children.Add(bulk);
+            stack.Children.Add(new TextBlock { Text = title, FontSize = 16 }); var bulk = new Button { Content = allText }; bulk.Click += (_, _) => TransferSelection(() => all.Execute(null)); stack.Children.Add(bulk);
             var entries = new ItemsControl { ItemsSource = people, ItemTemplate = new FuncDataTemplate<PersonSelection>((person, scope) =>
             {
                 var button = new Button { Content = person!.Name + (person.Selected ? "  −" : "  +"), HorizontalAlignment = HorizontalAlignment.Stretch };

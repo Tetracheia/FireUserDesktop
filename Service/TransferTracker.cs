@@ -60,7 +60,10 @@ public sealed class TransferTracker(TimeProvider? clock = null) : ITransferTrack
             return new(Id,direction,files,completed,bytes,total,speed,phase,finished,success,finishedAt){Purpose=purpose,CancellationRequested=cancelling};
         }
         public void SetTotal(long? value) { lock(owner.gate) { if(!finished) total=value is >=0 ? value : null; } }
-        public void SetPhase(string value) { lock(owner.gate) { if(!finished&&!cancelling) phase=value; } }
+        public void SetPhase(string value) {
+            lock(owner.gate) { if(finished || cancelling || phase == value) return; phase=value; }
+            owner.Changed?.Invoke();
+        }
         public void FileCompleted() { lock(owner.gate) { if(!finished) completed=Math.Min(files,completed+1); } }
         public void Complete(bool value)
         {

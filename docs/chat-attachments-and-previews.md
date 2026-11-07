@@ -53,3 +53,7 @@ The native message composer handles the operating system Paste action, including
 The visible conversation list sorts by `LastSent` descending after initial loading, refreshed snapshots, live messages and search changes. Equal timestamps use the conversation name for a stable ordering. Reordering retains the selected conversation.
 
 Regressions: `ConversationSnapshotsSortNewestFirstAndKeepSelectionDuringReordering`, `ComposerPasteStagesWholeFilesAndTextRemainsEditable`, and `PastedImageIsStagedAsACompletePngAndRemovedWithThePreview`. Verification ran on Linux with Avalonia headless tests. Native Windows/macOS clipboard behavior still needs target-platform checks.
+
+## Server scan stage
+
+The upload session ID correlates sender-only SignalR `AttachmentUploadStageChanged` events with the active transfer. After byte upload, the transfer and composer show **Scanning attachments for malware…**, followed by **Sending attachments…** after the scan succeeds. Scan stages hide byte percentages/speed and remain pending until the HTTP send confirms completion. Completed/cancelled operations ignore late events. Connection recovery fetches the active upload's stage once; no progress polling is used. Stage changes notify the dispatcher immediately and preserve reduced-motion behavior.

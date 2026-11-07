@@ -46,6 +46,21 @@ public sealed class ResumableAttachmentUploadTests
     }
     private static AttachmentUploadRequest Request(long size)=>new(Guid.NewGuid(),Guid.NewGuid(),null,"encrypted",null,[new("opaque.fua","application/octet-stream",size)]);
     [Fact]
+    public async Task SessionCorrelationIsAvailableBeforeAnyChunkOrCompletion()
+    {
+        var path=Path.GetTempFileName();
+        try {
+            await File.WriteAllBytesAsync(path,[1,2]);
+            using var server=new Server{Expected=2};using var client=new HttpClient(server);
+            var tracker=new TransferTracker();using var progress=tracker.Start(TransferDirection.Upload,1);
+            string? session=null;
+            await ResumableAttachmentUpload.SendAsync(client,"https://upload.invalid",Request(2),[path],progress,TestContext.Current.CancellationToken,id=>{
+                Assert.Equal(0,server.Puts);Assert.Equal(0,server.Completions);session=id;
+            });
+            Assert.Equal(Id,session);Assert.Equal(1,server.Completions);
+        }finally{File.Delete(path);}
+    }
+    [Fact]
     public async Task UploadAbove121MiBUsesBoundedRequestsAndOnlyCompletesAfterAllConfirmedBytes()
     {
         var path=Path.GetTempFileName();const long size=121L*1024*1024+417;

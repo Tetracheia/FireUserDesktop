@@ -210,6 +210,7 @@ public partial class ChatViewModel : ViewModelBase
 
     private void RegisterEvents()
     {
+        if (_chatService.Transfers is { } transfers) transfers.Changed += OnAttachmentTransferChanged;
         _chatService.MessageReceived += OnMessageReceived;
         _chatService.AttachmentPlayed += OnAttachmentPlayed;
         _chatService.MessageUpdated += OnMessageUpdated; _chatService.MessageDeleted += OnMessageDeleted;
@@ -226,6 +227,7 @@ public partial class ChatViewModel : ViewModelBase
 
     public void UnregisterEvents()
     {
+        if (_chatService.Transfers is { } transfers) transfers.Changed -= OnAttachmentTransferChanged;
         _chatService.MessageReceived -= OnMessageReceived;
         _chatService.AttachmentPlayed -= OnAttachmentPlayed;
         _chatService.MessageUpdated -= OnMessageUpdated; _chatService.MessageDeleted -= OnMessageDeleted;

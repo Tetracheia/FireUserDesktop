@@ -60,4 +60,12 @@ public sealed partial class DesktopIconographyTests
         try {Assert.Same(template,own.ContentTemplate);Assert.NotNull(automatic.ContentTemplate);var icon=AttachmentIcons.Create("Phone");automatic.Content=icon;Dispatcher.UIThread.RunJobs();Assert.Null(automatic.ContentTemplate);Assert.Same(icon,automatic.Content);Assert.Single(automatic.GetVisualDescendants().OfType<PathIcon>());}
         finally {window.Close();}
     }
+    [AvaloniaFact]
+    public void TurningOffGeneratedButtonIconsRemovesOnlyTheAutomaticTemplate()
+    {
+        var customTemplate=new FuncDataTemplate<string>((text,_)=>new TextBlock{Text="Custom "+text});var automatic=new Button{Content="Save"};var custom=new Button{Content="Save",ContentTemplate=customTemplate};var window=new Window{Content=new StackPanel{Children={automatic,custom}}};window.Show();Dispatcher.UIThread.RunJobs();
+        try{Assert.NotNull(automatic.ContentTemplate);DesktopIconography.SetEnabled(automatic,false);DesktopIconography.SetEnabled(custom,false);Dispatcher.UIThread.RunJobs();Assert.Null(automatic.ContentTemplate);Assert.Same(customTemplate,custom.ContentTemplate);Assert.Equal("Save",automatic.Content);DesktopIconography.SetEnabled(automatic,true);Assert.NotNull(automatic.ContentTemplate);}
+        finally{window.Close();}
+    }
+
 }

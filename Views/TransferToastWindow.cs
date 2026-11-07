@@ -82,9 +82,11 @@ public sealed class TransferToastWindow : Window
         {
             id=s.Id;cancel.IsVisible=!s.Finished;cancel.IsEnabled=!s.CancellationRequested;
             var upload=s.Direction==TransferDirection.Upload;var remote=s.Purpose==TransferPurpose.RemoteFile;
-            title.Text=s.Finished ? s.Succeeded ? upload?"Upload complete":"Download complete" : s.CancellationRequested?"Transfer cancelled":"Transfer failed" : remote?upload?"Uploading remote files":"Downloading remote files":upload?"Uploading attachments":"Downloading attachments";
+            var processing=upload && !remote && !s.Finished && s.Phase is "Scanning attachments for malware…" or "Sending attachments…";
+            title.Text=processing ? s.Phase.StartsWith("Scanning",StringComparison.Ordinal) ? "Scanning attachments" : "Sending attachments" : s.Finished ? s.Succeeded ? upload?"Upload complete":"Download complete" : s.CancellationRequested?"Transfer cancelled":"Transfer failed" : remote?upload?"Uploading remote files":"Downloading remote files":upload?"Uploading attachments":"Downloading attachments";
             count.Text=$"{s.CompletedFiles} of {s.TotalFiles} {(remote?"item":"attachment")}{(s.TotalFiles==1?"":"s")} {(upload?"uploaded":"downloaded")}";
-            bar.IsIndeterminate=!s.Finished && s.TotalBytes is null && !ownerReducedMotion;bar.Value=s.Percentage;
+            bar.IsIndeterminate=!s.Finished && (processing || s.TotalBytes is null) && !ownerReducedMotion;bar.Value=s.Percentage;
+            percentage.IsVisible=!processing; stats.IsVisible=!processing;
             percentage.Text=s.TotalBytes is null && !s.Succeeded ? "—" : $"{s.Percentage:0}%";
             stats.Text=$"{FormatBytes(s.Bytes)}{(s.TotalBytes is {} total ? " / "+FormatBytes(total):"")}  •  {(upload?"Upload":"Download")} {FormatBytes(s.BytesPerSecond)}/s";
             phase.Text=s.Phase;

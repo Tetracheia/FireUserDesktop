@@ -109,6 +109,7 @@ public sealed partial class WorkspaceInteractionTests
     private static void Save(Window window, string name)
     {
         if (Environment.GetEnvironmentVariable("FIREUSER_TEST_ARTIFACTS") is not {} directory) return;
+        Directory.CreateDirectory(directory);
         using var frame = Avalonia.Headless.HeadlessWindowExtensions.CaptureRenderedFrame(window); using var file = File.Create(Path.Combine(directory, name)); frame!.Save(file, new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
     }
 }

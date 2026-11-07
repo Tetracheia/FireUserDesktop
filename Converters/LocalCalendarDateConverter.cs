@@ -23,12 +23,14 @@ public sealed class LocalCalendarDateConverter : IValueConverter
 
 public sealed class CalendarDisplayDateConverter : IValueConverter
 {
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is DateTime date ? date.ToString("ddd, d MMM yyyy",culture) : "";
+    public string Format { get; set; } = "ddd, d MMM yyyy";
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is DateTime date ? date.ToString(Format,culture) : "";
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (string.IsNullOrWhiteSpace(value as string)) return null;
         var text = (string)value;
-        if (DateTime.TryParseExact(text,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out var date) ||
+        if (DateTime.TryParseExact(text,Format,culture,DateTimeStyles.None,out var date) ||
+            DateTime.TryParseExact(text,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out date) ||
             DateTime.TryParse(text,culture,DateTimeStyles.AllowWhiteSpaces,out date)) return date.Date;
         throw new FormatException("Choose a day from the calendar or enter a valid date.");
     }

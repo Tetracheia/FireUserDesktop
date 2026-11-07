@@ -14,14 +14,14 @@ namespace UserIdentityDesktop.Service;
 internal sealed record AttachmentUploadFile(string Name, string ContentType, long Size);
 internal sealed record AttachmentUploadRequest(Guid Sender, Guid Receiver, string? ConversationId, string? Text,
     string? ReplyToMessageId, List<AttachmentUploadFile> Files, List<UserIdentityDesktop.Core.Models.EncryptedNotificationPreview>? NotificationPreviews=null);
-internal sealed record AttachmentUploadStatus(string UploadId, List<long> Offsets);
+internal sealed record AttachmentUploadStatus(string UploadId, List<long> Offsets, string Stage = "uploading");
 
 /// <summary>Only chunk writes are recovered. Creation and final message publication are never replayed.</summary>
 internal static class ResumableAttachmentUpload
 {
     internal const int ChunkSize = 1024 * 1024;
     public static async Task SendAsync(HttpClient client, string server, AttachmentUploadRequest request,
-        IReadOnlyList<string> paths, ITransferOperation progress, CancellationToken ct = default)
+        IReadOnlyList<string> paths, ITransferOperation progress, CancellationToken ct = default, Action<string>? sessionCreated = null)
     {
         if (paths.Count != request.Files.Count || paths.Count == 0) throw new InvalidDataException("Invalid attachment batch.");
         long total = 0;
@@ -35,6 +35,7 @@ internal static class ResumableAttachmentUpload
         if (!Guid.TryParseExact(state.UploadId, "N", out _)) throw new InvalidDataException("Invalid upload session.");
         Validate(state, state.UploadId, request.Files);
         if (state.Offsets.Exists(x => x != 0)) throw new InvalidDataException("A new upload must start empty.");
+        sessionCreated?.Invoke(state.UploadId);
         var url = root + "/" + state.UploadId;
         var buffer = new byte[ChunkSize];
         for (var index = 0; index < paths.Count; index++)

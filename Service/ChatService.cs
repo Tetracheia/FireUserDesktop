@@ -19,10 +19,38 @@ public partial class ChatService : IChatService
     private readonly IAuthService _authService;
     private readonly IConfigurationService _configService;
     private readonly ChatEncryption _encryption;
+    private sealed class PendingUpload(ITransferOperation transfer)
+    {
+        public ITransferOperation Transfer { get; } = transfer;
+        public string? Stage { get; set; }
+    }
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, PendingUpload> pendingUploads = new();
+    private sealed record UploadStageNotice(string UploadId, string Stage);
+    private void UpdateUploadStage(UploadStageNotice status)
+    {
+        if (string.IsNullOrEmpty(status.UploadId) || !pendingUploads.TryGetValue(status.UploadId, out var transfer)) return;
+        var phase = status.Stage switch { "scanning" => "Scanning attachments for malware…", "sending" => "Sending attachments…", "failed" => "Attachments could not be sent", _ => null };
+        if (phase != null) lock (transfer) {
+            if (transfer.Stage == "sending" && status.Stage == "scanning") return;
+            transfer.Stage = status.Stage;
+            transfer.Transfer.SetPhase(phase);
+        }
+    }
+    private async Task RecoverUploadStages()
+    {
+        foreach (var id in pendingUploads.Keys)
+        {
+            try {
+                using var client = _authService.CreateAuthenticatedClient();
+                var status = await client.GetFromJsonAsync<AttachmentUploadStatus>(_configService.ServerUrl.TrimEnd('/') + "/api/Chat/Uploads/" + id, _jsonOptions);
+                if (status != null) UpdateUploadStage(new(id, status.Stage));
+            } catch { /* The pending HTTP send remains authoritative. */ }
+        }
+    }
     private HubConnection? _hubConnection;
     private CancellationTokenSource? connectionLifetime;
     private sealed class ContinuousReconnect : IRetryPolicy { public TimeSpan? NextRetryDelay(RetryContext context)=>TimeSpan.FromSeconds(Math.Min(30,Math.Pow(2,Math.Min(context.PreviousRetryCount,5)))); }
-    private void ConnectionChanged(HubConnectionState state){_authService.Actions?.SetConnected(state==HubConnectionState.Connected);ConnectionStateChanged?.Invoke(state);}
+    private void ConnectionChanged(HubConnectionState state){if(state==HubConnectionState.Connected)_ = RecoverUploadStages();_authService.Actions?.SetConnected(state==HubConnectionState.Connected);ConnectionStateChanged?.Invoke(state);}
     private async Task RecoverConnection(HubConnection connection,CancellationToken ct)
     {
         var attempt=0;
@@ -130,6 +158,7 @@ public partial class ChatService : IChatService
 
         _hubConnection.On("AppearancePreferencesChanged", () => AppearancePreferencesChanged?.Invoke());
         _hubConnection.On("WorkplaceChanged", () => WorkplaceChanged?.Invoke());
+        _hubConnection.On<UploadStageNotice>("AttachmentUploadStageChanged", UpdateUploadStage);
         _hubConnection.On<ChatActivity>("ChatActivity", activity => ChatActivityReceived?.Invoke(activity));
         _hubConnection.On<ConversationTyping>("ConversationTyping", typing => ConversationTypingReceived?.Invoke(typing));
         _hubConnection.On("ConversationsUpdated", async () => RecipientsUpdated?.Invoke(await GetRecipientsAsync()));
@@ -278,6 +307,7 @@ public partial class ChatService : IChatService
         if (paths.Count == 0) return false;
         using var transfer = Transfers.Start(TransferDirection.Upload, paths.Count);
         var prepared = new List<ChatEncryption.PreparedFile>();
+        string? uploadId = null;
         try
         {
             using var client = _authService.CreateAuthenticatedClient();
@@ -288,7 +318,7 @@ public partial class ChatService : IChatService
             await ResumableAttachmentUpload.SendAsync(client, _configService.ServerUrl,
                 new AttachmentUploadRequest(currentUser.Id, receiverId, conversationId, encrypted, replyTo,
                     prepared.ConvertAll(x => new AttachmentUploadFile(x.Metadata.Id + ".fua", "application/octet-stream", new FileInfo(x.Path).Length)), await _encryption.NotificationPreviewsAsync(encrypted,text)),
-                prepared.ConvertAll(x => x.Path), transfer,transfer.CancellationToken);
+                prepared.ConvertAll(x => x.Path), transfer,transfer.CancellationToken, id => { uploadId = id; pendingUploads[id] = new PendingUpload(transfer); });
             transfer.Complete(true);
             return true;
         }
@@ -299,6 +329,7 @@ public partial class ChatService : IChatService
         }
         finally
         {
+            if (uploadId != null) pendingUploads.TryRemove(uploadId, out _);
             foreach (var item in prepared) File.Delete(item.Path);
         }
     }

@@ -27,7 +27,11 @@ public sealed class DesktopIconography : AvaloniaObject
     }
     private static void Update(Control control)
     {
-        if (!GetEnabled(control)) return;
+        if (!GetEnabled(control))
+        {
+            if(control is Button disabledButton && ReferenceEquals(disabledButton.ContentTemplate,Labels))disabledButton.SetCurrentValue(ContentControl.ContentTemplateProperty,null);
+            return;
+        }
         if (control is Button button)
         {
             if(button.Parent is StackPanel group && !group.IsSet(StackPanel.SpacingProperty) && group.Children.Count>1 && group.Children.All(x=>x is Button)) group.SetCurrentValue(StackPanel.SpacingProperty,8d);

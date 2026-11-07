@@ -1,0 +1,49 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="using:UserIdentityDesktop.Views" xmlns:converters="using:UserIdentityDesktop.Converters">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <converters:CalendarDisplayDateConverter x:Key="ComposeDateText" Format="dd-MM-yyyy"/>
+      <ControlTheme x:Key="ComposeCalendarTrigger" TargetType="Button">
+        <Setter Property="Width" Value="40"/><Setter Property="Height" Value="42"/><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource ForgeTextSecondary}"/><Setter Property="views:DesktopIconography.Enabled" Value="False"/>
+        <Setter Property="Template"><ControlTemplate><Border Background="Transparent"><Path Data="M4,6 L8,10 12,6" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.6" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Setter>
+      </ControlTheme>
+      <ControlTheme x:Key="ComposeCalendarDatePicker" TargetType="CalendarDatePicker" BasedOn="{StaticResource {x:Type CalendarDatePicker}}">
+        <Setter Property="Template"><ControlTemplate><DataValidationErrors><Panel>
+          <Border Name="Background" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"/>
+          <Grid ColumnDefinitions="40,*,40">
+            <PathIcon Data="M3,4 L21,4 21,22 3,22 Z M5,9 L19,9 19,20 5,20 Z M7,1 L9,1 9,7 7,7 Z M15,1 L17,1 17,7 15,7 Z" Foreground="{DynamicResource ForgePrimary}" Width="16" Height="16" IsHitTestVisible="False"/>
+            <TextBox Name="PART_TextBox" Grid.Column="1" Foreground="{TemplateBinding Foreground}" FontSize="{TemplateBinding FontSize}" FontWeight="Normal" Background="Transparent" BorderThickness="0" Padding="0" MinHeight="0" CornerRadius="{TemplateBinding CornerRadius}" VerticalContentAlignment="Center" IsReadOnly="True" PlaceholderText="{TemplateBinding PlaceholderText}" PlaceholderForeground="{TemplateBinding PlaceholderForeground}" UseFloatingPlaceholder="False">
+              <TextBox.Styles><Style Selector="TextBox /template/ Border#PART_BorderElement"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style><Style Selector="TextBox:focus /template/ Border#PART_BorderElement"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style></TextBox.Styles>
+            </TextBox>
+            <Button Name="PART_Button" Grid.Column="2" Theme="{StaticResource ComposeCalendarTrigger}" Focusable="False" AutomationProperties.Name="Open calendar"/>
+            <Popup Name="PART_Popup" PlacementTarget="{TemplateBinding}" IsLightDismissEnabled="True"><Calendar Name="PART_Calendar" FirstDayOfWeek="{TemplateBinding FirstDayOfWeek}" IsTodayHighlighted="{TemplateBinding IsTodayHighlighted}" SelectedDate="{Binding RelativeSource={RelativeSource TemplatedParent},Path=SelectedDate,Mode=TwoWay}" DisplayDate="{TemplateBinding DisplayDate}" DisplayDateStart="{TemplateBinding DisplayDateStart}" DisplayDateEnd="{TemplateBinding DisplayDateEnd}"/></Popup>
+          </Grid>
+        </Panel></DataValidationErrors></ControlTemplate></Setter>
+      </ControlTheme>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="ForgeBg" Color="#191A1C"/><SolidColorBrush x:Key="ForgeSurfaceCard" Color="#1F2125"/><SolidColorBrush x:Key="ForgeSurface" Color="#212227"/><SolidColorBrush x:Key="ForgeBgSecondary" Color="#1E1F23"/><SolidColorBrush x:Key="ComposeInput" Color="#212128"/><SolidColorBrush x:Key="ForgeBorder" Color="#333439"/><SolidColorBrush x:Key="ForgeTextPrimary" Color="#F0F2F5"/><SolidColorBrush x:Key="ForgeTextSecondary" Color="#B0B5BE"/><SolidColorBrush x:Key="ForgeTextMuted" Color="#989FAA"/><SolidColorBrush x:Key="ForgePrimary" Color="#DD7036"/>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="ForgeBg" Color="#F5F4F0"/><SolidColorBrush x:Key="ForgeSurfaceCard" Color="#FFFFFF"/><SolidColorBrush x:Key="ForgeSurface" Color="#FFFFFF"/><SolidColorBrush x:Key="ForgeBgSecondary" Color="#EBE8E2"/><SolidColorBrush x:Key="ComposeInput" Color="#FFFFFF"/><SolidColorBrush x:Key="ForgeBorder" Color="#DCD9D5"/><SolidColorBrush x:Key="ForgeTextPrimary" Color="#1F242B"/><SolidColorBrush x:Key="ForgeTextSecondary" Color="#58606E"/><SolidColorBrush x:Key="ForgeTextMuted" Color="#606975"/><SolidColorBrush x:Key="ForgePrimary" Color="#E0531C"/>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Styles.Resources>
+  <Style Selector="Window.compose-form"><Setter Property="FontSize" Value="14"/><Setter Property="Background" Value="{DynamicResource ForgeBg}"/><Setter Property="Foreground" Value="{DynamicResource ForgeTextPrimary}"/></Style>
+  <Style Selector="Window.compose-form Button"><Setter Property="views:DesktopIconography.Enabled" Value="False"/></Style>
+  <Style Selector="Window.compose-form CheckBox"><Setter Property="views:DesktopIconography.Enabled" Value="False"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="FontSize" Value="13.6"/></Style>
+  <Style Selector="Window.compose-form Border.compose-card"><Setter Property="Background" Value="{DynamicResource ForgeSurfaceCard}"/><Setter Property="BorderBrush" Value="{DynamicResource ForgeBorder}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="16"/><Setter Property="Padding" Value="20"/><Setter Property="BoxShadow" Value="0 4 12 0 #18000000"/></Style>
+  <Style Selector="Window.compose-form TextBlock.compose-title"><Setter Property="FontSize" Value="16.8"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
+  <Style Selector="Window.compose-form TextBlock.form-label"><Setter Property="FontSize" Value="13.6"/><Setter Property="FontWeight" Value="Medium"/><Setter Property="Foreground" Value="{DynamicResource ForgeTextSecondary}"/></Style>
+  <Style Selector="Window.compose-form TextBlock.form-help"><Setter Property="FontSize" Value="13.6"/><Setter Property="LineHeight" Value="21"/><Setter Property="Foreground" Value="{DynamicResource ForgeTextSecondary}"/></Style>
+  <Style Selector="Window.compose-form Border.form-note"><Setter Property="CornerRadius" Value="16"/><Setter Property="Padding" Value="20"/></Style>
+  <Style Selector="Window.compose-form ScrollViewer.compose-scroll /template/ ScrollBar#PART_VerticalScrollBar"><Setter Property="Width" Value="18"/></Style>
+  <Style Selector="Window.compose-form TextBox"><Setter Property="FontSize" Value="14"/><Setter Property="MinHeight" Value="44"/><Setter Property="Padding" Value="12,10"/><Setter Property="CornerRadius" Value="8"/><Setter Property="Background" Value="{DynamicResource ForgeSurfaceCard}"/></Style>
+  <Style Selector="Window.compose-form ComboBox"><Setter Property="MinHeight" Value="44"/><Setter Property="CornerRadius" Value="16"/><Setter Property="Background" Value="{DynamicResource ComposeInput}"/></Style>
+  <Style Selector="Window.compose-form TimePicker"><Setter Property="MinHeight" Value="44"/><Setter Property="CornerRadius" Value="16"/><Setter Property="Background" Value="{DynamicResource ComposeInput}"/></Style>
+  <Style Selector="Window.compose-form CalendarDatePicker"><Setter Property="Theme" Value="{StaticResource ComposeCalendarDatePicker}"/><Setter Property="TextConverter" Value="{StaticResource ComposeDateText}"/><Setter Property="CustomDateFormatString" Value="dd-MM-yyyy"/><Setter Property="FontSize" Value="15.2"/><Setter Property="MinHeight" Value="46"/><Setter Property="CornerRadius" Value="16"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Background" Value="{DynamicResource ComposeInput}"/></Style>
+  <Style Selector="Window.compose-form CalendarDatePicker /template/ Button#PART_Button"><Setter Property="Foreground" Value="{DynamicResource ForgeTextSecondary}"/><Setter Property="Width" Value="40"/><Setter Property="Height" Value="42"/></Style>
+  <Style Selector="Window.compose-form CalendarDatePicker /template/ Border#Background"><Setter Property="BoxShadow" Value="0 4 10 0 #28000000"/></Style>
+  <Style Selector="Window.compose-form CalendarDatePicker /template/ TextBox"><Setter Property="Padding" Value="0"/><Setter Property="MinHeight" Value="0"/><Setter Property="Background" Value="Transparent"/></Style>
+  <Style Selector="Window.compose-form CalendarDatePicker:focus-within /template/ Border#Background"><Setter Property="BorderThickness" Value="1.5"/></Style>
+</Styles>

@@ -14,10 +14,11 @@ internal sealed class VacationReviewWindow : Window
 {
     public VacationReviewWindow(DateTimeOffset? start, DateTimeOffset? end, string reason, VacationPreview review)
     {
+        ComposeAppearance.Apply(this);
         Title="Review vacation request";Width=680;Height=640;MinWidth=440;MinHeight=400;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         this.Bind(BackgroundProperty,this.GetResourceObservable("ForgeBg"));this.Bind(ForegroundProperty,this.GetResourceObservable("ForgeTextPrimary"));
         var heading=new StackPanel {Spacing=6,Margin=new Thickness(20,16)};
-        heading.Children.Add(new TextBlock{Text=Title,FontSize=24,FontWeight=FontWeight.SemiBold});
+        heading.Children.Add(new TextBlock{Text=Title,FontSize=16.8,FontWeight=FontWeight.Bold});
         heading.Children.Add(new TextBlock{Text=$"{start:ddd, d MMM yyyy} – {end:ddd, d MMM yyyy}",TextWrapping=TextWrapping.Wrap});
         var body=new StackPanel{Spacing=8,Margin=new Thickness(20,0,20,16)};
         var days=review.Shifts.Sum(x=>x.Days);

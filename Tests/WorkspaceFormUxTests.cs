@@ -28,12 +28,12 @@ public sealed partial class WorkspaceInteractionTests
         var (vm,_,_)=Create();var view=new WorkspaceView{DataContext=vm};var owner=new Window{Content=view,Width=1100,Height=900,RequestedThemeVariant=light?ThemeVariant.Light:ThemeVariant.Dark};owner.Show();
         try
         {
-            vm.ShowCalendarEditor=true;Dispatcher.UIThread.RunJobs();var form=Assert.Single(view.EditorWindows);
+            vm.ShowVacationEditor=true;Dispatcher.UIThread.RunJobs();var form=Assert.Single(view.EditorWindows);
             Assert.Empty(form.GetVisualDescendants().OfType<DatePicker>());
-            var picker=Assert.Single(form.GetVisualDescendants().OfType<CalendarDatePicker>());
+            var picker=form.GetVisualDescendants().OfType<CalendarDatePicker>().First();
             var day=new DateTime(DateTime.Today.Year,DateTime.Today.Month,17);
-            picker.SetCurrentValue(CalendarDatePicker.SelectedDateProperty,day);Dispatcher.UIThread.RunJobs();Assert.Equal(day,vm.EventDate!.Value.Date);
-            picker.Text="2027-02-11";Dispatcher.UIThread.RunJobs();Assert.Equal(new DateTime(2027,2,11),vm.EventDate!.Value.Date);
+            picker.SetCurrentValue(CalendarDatePicker.SelectedDateProperty,day);Dispatcher.UIThread.RunJobs();Assert.Equal(day,vm.VacationStart!.Value.Date);
+            picker.Text="2027-02-11";Dispatcher.UIThread.RunJobs();Assert.Equal(new DateTime(2027,2,11),vm.VacationStart!.Value.Date);
             picker.SetCurrentValue(CalendarDatePicker.SelectedDateProperty,day);Dispatcher.UIThread.RunJobs();
             picker.IsDropDownOpen=true;Dispatcher.UIThread.RunJobs();
             var popup=Assert.Single(picker.GetVisualDescendants().OfType<Popup>());var calendar=Assert.IsType<Calendar>(popup.Child);
@@ -66,10 +66,12 @@ public sealed partial class WorkspaceInteractionTests
             else if(kind==WorkspaceFormKind.Vacation)vm.ShowVacationEditor=true;else vm.ShowAnnouncementEditor=true;
             Dispatcher.UIThread.RunJobs();var form=Assert.Single(view.EditorWindows);form.Width=480;form.Height=560;Dispatcher.UIThread.RunJobs();
             Assert.Empty(form.GetVisualDescendants().OfType<DatePicker>());
-            Assert.Equal(kind==WorkspaceFormKind.Calendar?1:2,form.GetVisualDescendants().OfType<CalendarDatePicker>().Count());
+            Assert.Equal(kind==WorkspaceFormKind.Vacation?2:0,form.GetVisualDescendants().OfType<CalendarDatePicker>().Count());
+            Assert.Equal(kind==WorkspaceFormKind.Vacation?0:2,form.GetVisualDescendants().OfType<ComposeDateTimePicker>().Count());
             var pairs=form.GetVisualDescendants().OfType<Grid>().Where(x=>x.Classes.Contains("form-pair")).ToArray();Assert.NotEmpty(pairs);
             foreach(var pair in pairs){Assert.Single(pair.ColumnDefinitions);Assert.Equal(1,Grid.GetRow(pair.Children[1]));}
             var submit=form.GetVisualDescendants().OfType<Button>().Single(x=>x.Name=="FormSubmit");
+            ((ScrollViewer)form.Editor).ScrollToEnd();Dispatcher.UIThread.RunJobs();
             var point=submit.TranslatePoint(new Point(submit.Bounds.Width,submit.Bounds.Height),form)!.Value;
             Assert.InRange(point.X,1,form.ClientSize.Width);Assert.InRange(point.Y,1,form.ClientSize.Height);
             Save(form,$"submission-{kind}-compact-{(light?"light":"dark")}.png");await form.CloseAnimatedAsync();
@@ -173,7 +175,7 @@ public sealed partial class WorkspaceInteractionTests
         try
         {
             var labels=view.GetVisualDescendants().OfType<TextBlock>().Select(x=>x.Text).ToArray();Assert.Contains("Maya Hassan",labels);Assert.DoesNotContain(request.UserId.ToString(),labels);Assert.DoesNotContain(request.Id.ToString(),labels);
-            vm.ShowVacationEditor=true;Dispatcher.UIThread.RunJobs();var form=Assert.Single(view.EditorWindows);Assert.Equal(680,form.Height);var texts=form.GetVisualDescendants().OfType<TextBlock>().Select(x=>x.Text).ToArray();
+            vm.ShowVacationEditor=true;Dispatcher.UIThread.RunJobs();var form=Assert.Single(view.EditorWindows);Assert.Equal(840,form.Height);var texts=form.GetVisualDescendants().OfType<TextBlock>().Select(x=>x.Text).ToArray();
             Assert.Contains("Plan your time off",texts);Assert.Contains("Annual entitlement",texts);Assert.Contains("Available",texts);Assert.Contains("1 leave day",texts);Assert.Contains("2027 balance: 20 available → 19 after this request",texts);Assert.Contains("Reason (optional)",texts);
             var submit=form.GetVisualDescendants().OfType<Button>().Single(x=>x.Name=="FormSubmit");Assert.Equal("Review request",submit.Content);Assert.Same(vm.ReviewVacationRequestCommand,submit.Command);
             var reason=form.GetVisualDescendants().OfType<TextBox>().Single(x=>AutomationProperties.GetName(x)=="Vacation reason");

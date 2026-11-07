@@ -97,7 +97,7 @@
                 <Button Grid.Column="3" Classes="fire-btn square" Command="{Binding SendMessageCommand}" IsVisible="{Binding HasVoiceNote}" IsEnabled="{Binding !IsSendingMessage}" CornerRadius="24" ToolTip.Tip="Send voice note" AutomationProperties.Name="Send voice note"><PathIcon Data="{StaticResource Glyph.Send}" Width="18" Height="18" /></Button>
               </Grid>
             </Border>
-            <TextBlock Text="Uploading attachments…" IsVisible="{Binding IsUploadingAttachments}" Classes="caption" />
+            <TextBlock Text="{Binding AttachmentSendingStage}" IsVisible="{Binding IsUploadingAttachments}" Classes="caption" />
             <TextBlock Text="{Binding SendError}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeDanger}" FontSize="12" IsVisible="{Binding SendError, Converter={StaticResource NullToBoolConverter}}" />
           </StackPanel>
         </Grid>
