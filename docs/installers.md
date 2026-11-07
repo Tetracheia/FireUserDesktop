@@ -20,6 +20,8 @@ The packaged .NET runtime, native bridge/SDK, FFmpeg and Windows app-local C++ r
 
 Linux FFmpeg archives are checksum-pinned to the supplier's last build of the month, retained for two years; ordinary daily archives expire after 14 builds. Refresh these pins before their retention expires, or mirror the verified archives for longer reproducibility. The macOS ARM CI host is macOS 15 because GitHub has retired macOS 14 runners; the packaged application still targets macOS 14.
 
+AppImage packaging pins appimagetool 1.9.1 and type2-runtime 20251108 with SHA-256 verification. Use versioned release URLs rather than the moving `continuous` assets; update URLs and hashes together. The local tool cache is separated by the pinned definitions.
+
 Use a dependency-resolving installer, for example `apt install ./file.deb`, `dnf install ./file.rpm` or `pacman -U ./file.pkg.tar.zst`. The Linux builds originate on Ubuntu 22.04 to keep the libc baseline older than current Fedora/Arch. Portable AppImages do not install host dependencies automatically; if FUSE is unavailable their runtime supports `--appimage-extract-and-run`. AppImage registration uses the persistent AppImage path rather than its temporary mount.
 
 OS microphone, camera, Screen Recording and Accessibility permissions remain explicit user choices. Installers do not grant those privileges, alter firewall rules or replace system glibc. Arch packages and installers are not added to official distribution repositories by this workflow.

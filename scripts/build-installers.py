@@ -93,7 +93,9 @@ def appimage(source, output, version, arch, work):
     shutil.copy2(ROOT / 'Assets/Icons/fire-user-connect-512.png', appdir / 'fire-user-connect.png')
     shutil.copy2(appdir / 'fire-user-connect.png', appdir / '.DirIcon')
     definitions = json.loads((ROOT / 'packaging/appimage-tools.json').read_text())[arch]
-    cache = ROOT / 'Native/sdk/appimage-tools' / arch
+    # Keep previous verified tools separate when a release pin changes.
+    cache_key = hashlib.sha256(json.dumps(definitions, sort_keys=True).encode()).hexdigest()
+    cache = ROOT / 'Native/sdk/appimage-tools' / arch / cache_key
     cache.mkdir(parents=True, exist_ok=True)
     tool, runtime = cache / 'appimagetool.AppImage', cache / 'runtime'
     verified_download(definitions['toolUrl'], definitions['toolSha256'], tool)
