@@ -1,8 +1,12 @@
+
 name: Native desktop validation
+
 run-name: Fire User desktop - ${{ inputs.request_id || github.run_number }}
+
 on:
   push:
-    branches-ignore: ['codex/publish-test-installers-*']
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
     inputs:
@@ -10,67 +14,111 @@ on:
         description: Package to build
         type: choice
         default: all
-        options: [all, win-x64, win-arm64, osx-x64, osx-arm64, linux-x64, linux-arm64]
-      release_run_id:
-        description: Publish installers from this completed successful run (leave empty to build)
-        type: string
-        required: false
-      release_tag:
-        description: Existing draft test release tag for the exact build commit
-        type: string
-        required: false
+        options:
+          - all
+          - win-x64
+          - win-arm64
+          - osx-x64
+          - osx-arm64
+          - linux-x64
+          - linux-arm64
       request_id:
-        description: Correlation ID used by the local build command
+        description: Optional build correlation ID
         type: string
         required: false
+
 concurrency:
   group: desktop-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
+
 permissions:
   contents: read
+
 jobs:
+
+  # --------------------------------------------------
+  # Select target platforms
+  # --------------------------------------------------
+
   plan:
-    if: inputs.release_run_id == ''
+    name: Prepare build matrix
     runs-on: ubuntu-22.04
+
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
+
     steps:
-      - id: select
+      - name: Select platforms
+        id: select
         env:
           BUILD_TARGET: ${{ inputs.target || 'all' }}
         run: |
           python3 - <<'PY'
-          import json, os
+          import json
+          import os
+
           entries = [
-              {'os': 'windows-2022', 'rid': 'win-x64'},
-              {'os': 'ubuntu-22.04', 'rid': 'linux-x64'},
-              {'os': 'ubuntu-22.04-arm', 'rid': 'linux-arm64'},
-              {'os': 'macos-15', 'rid': 'osx-arm64'},
-              {'os': 'macos-15-intel', 'rid': 'osx-x64'},
+              {"os": "windows-2022", "rid": "win-x64"},
+              {"os": "ubuntu-22.04", "rid": "linux-x64"},
+              {"os": "ubuntu-22.04-arm", "rid": "linux-arm64"},
+              {"os": "macos-15", "rid": "osx-arm64"},
+              {"os": "macos-15-intel", "rid": "osx-x64"},
           ]
-          target = os.environ['BUILD_TARGET']
-          # Windows ARM uses the x64 package under Windows 11 emulation.
-          native_target = 'win-x64' if target == 'win-arm64' else target
-          selected = [item for item in entries if target == 'all' or item['rid'] == native_target]
+
+          target = os.environ["BUILD_TARGET"]
+
+          # Windows ARM64 runs the x64 package through emulation.
+          native_target = (
+              "win-x64"
+              if target == "win-arm64"
+              else target
+          )
+
+          selected = [
+              item for item in entries
+              if target == "all"
+              or item["rid"] == native_target
+          ]
+
           if not selected:
-              raise SystemExit('Unsupported package target')
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write('matrix=' + json.dumps({'include': selected}) + '\n')
+              raise SystemExit("Unsupported package target")
+
+          matrix = {"include": selected}
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(
+                  "matrix=" + json.dumps(matrix) + "\n"
+              )
           PY
+
+  # --------------------------------------------------
+  # Parallel desktop builds
+  # --------------------------------------------------
+
   desktop:
+    name: Build ${{ matrix.rid }}
     needs: plan
+
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+
     runs-on: ${{ matrix.os }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - uses: actions/setup-python@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Cache verified macOS media runtime
         id: media-cache
         if: runner.os == 'macOS'
@@ -78,89 +126,235 @@ jobs:
         with:
           path: Native/media/${{ matrix.rid }}
           key: source-media-${{ matrix.rid }}-${{ hashFiles('scripts/media-runtimes.json', 'scripts/build-native.py') }}
+
       - name: Linux development dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxtst-dev libxcb1-dev libfontconfig1 libice6 libsm6 libssl-dev python3 xvfb dbus-daemon libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 gstreamer1.0-plugins-base gstreamer1.0-pipewire rpm zstd squashfs-tools desktop-file-utils file
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev \
+            libxtst-dev \
+            libxcb1-dev \
+            libfontconfig1 \
+            libice6 \
+            libsm6 \
+            libssl-dev \
+            python3 \
+            xvfb \
+            dbus-daemon \
+            libgstreamer1.0-0 \
+            libgstreamer-plugins-base1.0-0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-pipewire \
+            rpm \
+            zstd \
+            squashfs-tools \
+            desktop-file-utils \
+            file
+
       - name: macOS media build dependencies
         if: runner.os == 'macOS'
-        run: brew list nasm >/dev/null 2>&1 || brew install nasm
-      - name: Build and smoke-test official LiveKit C++ bridge (Windows)
+        run: |
+          brew list nasm >/dev/null 2>&1 || brew install nasm
+
+      - name: Build and smoke-test LiveKit bridge (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/build-native.ps1 -RuntimeIdentifier '${{ matrix.rid }}'
-      - name: Build and smoke-test official LiveKit C++ bridge (Unix)
+        run: |
+          ./scripts/build-native.ps1 -RuntimeIdentifier '${{ matrix.rid }}'
+
+      - name: Build and smoke-test LiveKit bridge (Unix)
         if: runner.os != 'Windows'
-        run: python3 scripts/build-native.py --rid '${{ matrix.rid }}'
+        run: |
+          python3 scripts/build-native.py \
+            --rid '${{ matrix.rid }}'
+
       - name: Check build tooling
         run: |
-          python -m unittest discover -s Tests -p '*Build*Tests.py'
-          python -m unittest discover -s Tests -p 'MacBundleTests.py'
+          python -m unittest discover \
+            -s Tests -p '*Build*Tests.py'
+
+          python -m unittest discover \
+            -s Tests -p 'MacBundleTests.py'
+
       - name: Build Avalonia client
-        run: dotnet build UserIdentityDesktop.csproj -c Release
+        run: |
+          dotnet build UserIdentityDesktop.csproj \
+            -c Release
+
       - name: Verify built macOS media runtime
         id: mac-media
         if: runner.os == 'macOS'
-        run: Native/media/${{ matrix.rid }}/ffmpeg -version
+        run: |
+          Native/media/${{ matrix.rid }}/ffmpeg -version
+
       - name: Linux native startup smoke test
         if: runner.os == 'Linux'
         shell: bash
         run: |
           smoke_root=$(mktemp -d)
-          mkdir -p "$smoke_root/config" "$smoke_root/data" "$smoke_root/cache"
-          XDG_CONFIG_HOME="$smoke_root/config" XDG_DATA_HOME="$smoke_root/data" XDG_CACHE_HOME="$smoke_root/cache" timeout 30s xvfb-run -a "./bin/Release/net10.0/Fire User Connect" --startup-smoke-test
+
+          mkdir -p \
+            "$smoke_root/config" \
+            "$smoke_root/data" \
+            "$smoke_root/cache"
+
+          XDG_CONFIG_HOME="$smoke_root/config" \
+          XDG_DATA_HOME="$smoke_root/data" \
+          XDG_CACHE_HOME="$smoke_root/cache" \
+          timeout 30s xvfb-run -a \
+            "./bin/Release/net10.0/Fire User Connect" \
+            --startup-smoke-test
+
       - name: Test contracts, encryption, native control policy and UI
-        run: dotnet test Tests/UserIdentityDesktop.Tests.csproj -c Release
+        run: |
+          dotnet test \
+            Tests/UserIdentityDesktop.Tests.csproj \
+            -c Release
+
+      # --------------------------------------------------
+      # Publish portable application
+      # --------------------------------------------------
+
       - name: Package native client
         if: runner.os != 'Linux'
         shell: pwsh
-        run: ./scripts/publish-desktop.ps1 -RuntimeIdentifier '${{ matrix.rid }}'
+        run: |
+          ./scripts/publish-desktop.ps1 \
+            -RuntimeIdentifier '${{ matrix.rid }}'
+
       - name: Package Linux client
         if: runner.os == 'Linux'
-        run: dotnet publish UserIdentityDesktop.csproj -c Release -r '${{ matrix.rid }}' --self-contained true -o 'artifacts/${{ matrix.rid }}'
-      - name: Verify portable Linux ABI baseline
+        run: |
+          dotnet publish UserIdentityDesktop.csproj \
+            -c Release \
+            -r '${{ matrix.rid }}' \
+            --self-contained true \
+            -o 'artifacts/${{ matrix.rid }}'
+
+      - name: Verify Linux ABI baseline
         if: runner.os == 'Linux'
-        run: python3 scripts/check-linux-abi.py --source 'artifacts/${{ matrix.rid }}'
-      - name: Verify packaged media executable without capturing devices
+        run: |
+          python3 scripts/check-linux-abi.py \
+            --source 'artifacts/${{ matrix.rid }}'
+
+      - name: Verify packaged media executable
         env:
           PACKAGE_RID: ${{ matrix.rid }}
         run: |
           python -c "import os,subprocess; from pathlib import Path; rid=os.environ['PACKAGE_RID']; binary=Path('artifacts')/rid/'media'/('ffmpeg.exe' if rid.startswith('win-') else 'ffmpeg'); subprocess.run([str(binary),'-version'],check=True)"
-      - name: Verify packaged Windows or Mac application startup
+
+      - name: Verify Windows or macOS packaged startup
         if: runner.os != 'Linux'
         shell: pwsh
         env:
           PACKAGE_RID: ${{ matrix.rid }}
         run: |
           $packageRoot = Join-Path $PWD "artifacts/$env:PACKAGE_RID"
-          $binary = if ($IsWindows) { Join-Path $packageRoot 'Fire User Connect.exe' } else { Join-Path $packageRoot 'Fire User Connect.app/Contents/MacOS/Fire User Connect' }
-          $process = Start-Process -FilePath $binary -ArgumentList '--startup-smoke-test' -PassThru
-          if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Packaged application startup timed out.' }
-          if ($process.ExitCode) { throw 'Packaged application startup failed.' }
+
+          $binary = if ($IsWindows) {
+            Join-Path $packageRoot 'Fire User Connect.exe'
+          } else {
+            Join-Path $packageRoot 'Fire User Connect.app/Contents/MacOS/Fire User Connect'
+          }
+
+          $process = Start-Process `
+            -FilePath $binary `
+            -ArgumentList '--startup-smoke-test' `
+            -PassThru
+
+          if (-not $process.WaitForExit(30000)) {
+            $process.Kill()
+            throw 'Packaged application startup timed out.'
+          }
+
+          if ($process.ExitCode) {
+            throw 'Packaged application startup failed.'
+          }
+
+      # --------------------------------------------------
+      # Generate installer
+      # --------------------------------------------------
+
       - name: Create OS installers
-        run: python scripts/build-installers.py --rid '${{ matrix.rid }}' --source 'artifacts/${{ matrix.rid }}' --output installers
+        run: |
+          python scripts/build-installers.py \
+            --rid '${{ matrix.rid }}' \
+            --source 'artifacts/${{ matrix.rid }}' \
+            --output installers
+
+      - name: Verify installer output
+        shell: bash
+        run: |
+          if [ ! -d installers ]; then
+            echo "::error::Installer directory missing"
+            exit 1
+          fi
+
+          if [ -z "$(find installers -type f -print -quit)" ]; then
+            echo "::error::No installer files generated"
+            exit 1
+          fi
+
+          echo "Generated installers:"
+          find installers -type f -print
+
+      # --------------------------------------------------
+      # Upload installers as GitHub Actions artifacts
+      # --------------------------------------------------
+
       - name: Upload OS installers
         uses: actions/upload-artifact@v4
         with:
           name: fire-user-installers-${{ matrix.rid }}
           path: installers/*
           if-no-files-found: error
-      - name: Archive package preserving Unix executable permissions
+          retention-days: 30
+          compression-level: 0
+
+      # --------------------------------------------------
+      # Archive portable application
+      # --------------------------------------------------
+
+      - name: Archive Unix application
         if: runner.os != 'Windows'
         run: |
           mkdir -p packages
-          tar -czf 'packages/fire-user-${{ matrix.rid }}.tar.gz' -C 'artifacts/${{ matrix.rid }}' .
-      - name: Archive Windows package
+
+          tar -czf \
+            'packages/fire-user-${{ matrix.rid }}.tar.gz' \
+            -C 'artifacts/${{ matrix.rid }}' .
+
+      - name: Archive Windows application
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path packages -Force | Out-Null
-          tar -czf 'packages/fire-user-${{ matrix.rid }}.tar.gz' -C 'artifacts/${{ matrix.rid }}' .
-          if ($LASTEXITCODE) { throw 'Package archive failed.' }
-      - uses: actions/upload-artifact@v4
+          New-Item `
+            -ItemType Directory `
+            -Path packages `
+            -Force | Out-Null
+
+          tar -czf `
+            'packages/fire-user-${{ matrix.rid }}.tar.gz' `
+            -C 'artifacts/${{ matrix.rid }}' .
+
+          if ($LASTEXITCODE) {
+            throw 'Package archive failed.'
+          }
+
+      - name: Upload portable application
+        uses: actions/upload-artifact@v4
         with:
           name: fire-user-${{ matrix.rid }}
           path: packages/fire-user-${{ matrix.rid }}.tar.gz
           if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      # --------------------------------------------------
+      # Windows ARM64 compatibility preparation
+      # --------------------------------------------------
+
       - name: Upload Windows native validation executable
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
@@ -168,131 +362,376 @@ jobs:
           name: native-validation-win-x64
           path: Native/build/win-x64/Release/bridge_smoke.exe
           if-no-files-found: error
-      - name: Compile Windows ARM compatibility installer on x64 build host
+          retention-days: 30
+
+      - name: Compile Windows ARM compatibility installer
         if: runner.os == 'Windows'
-        run: python scripts/build-installers.py --rid win-arm64-emulated --source artifacts/win-x64 --output arm-installers
-      - name: Stage Windows ARM installer for ARM runner verification
+        run: |
+          python scripts/build-installers.py \
+            --rid win-arm64-emulated \
+            --source artifacts/win-x64 \
+            --output arm-installers
+
+      - name: Stage Windows ARM installer for verification
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: installer-validation-win-arm64
           path: arm-installers/*
           if-no-files-found: error
-      - name: Save verified macOS media runtime
-        if: always() && runner.os == 'macOS' && steps.mac-media.outcome == 'success' && steps.media-cache.outputs.cache-hit != 'true'
+          retention-days: 30
+
+      # --------------------------------------------------
+      # Save verified macOS media runtime
+      # --------------------------------------------------
+
+      - name: Save macOS media runtime cache
+        if: >-
+          always() &&
+          runner.os == 'macOS' &&
+          steps.mac-media.outcome == 'success' &&
+          steps.media-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: Native/media/${{ matrix.rid }}
           key: source-media-${{ matrix.rid }}-${{ hashFiles('scripts/media-runtimes.json', 'scripts/build-native.py') }}
+
+  # --------------------------------------------------
+  # Windows ARM64 compatibility validation
+  # --------------------------------------------------
+
   windows-arm:
     name: Windows 11 ARM64 (x64 emulation)
-    needs: desktop
-    if: github.event_name != 'workflow_dispatch' || inputs.target == 'all' || inputs.target == 'win-arm64'
+
+    needs:
+      - desktop
+
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      inputs.target == 'all' ||
+      inputs.target == 'win-arm64'
+
     runs-on: windows-11-arm
+
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download Windows x64 package
+        uses: actions/download-artifact@v4
         with:
           name: fire-user-win-x64
           path: incoming
-      - uses: actions/download-artifact@v4
+
+      - name: Download native validation executable
+        uses: actions/download-artifact@v4
         with:
           name: native-validation-win-x64
           path: validation
-      - uses: actions/download-artifact@v4
+
+      - name: Download ARM compatibility installer
+        uses: actions/download-artifact@v4
         with:
           name: installer-validation-win-arm64
           path: installers
+
       - name: Verify complete x64 package on Windows ARM
         shell: pwsh
         run: |
-          if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'Arm64') { throw 'Expected an ARM64 Windows host.' }
-          New-Item -ItemType Directory -Path artifacts/win-arm64-emulated,packages -Force | Out-Null
-          tar -xzf incoming/fire-user-win-x64.tar.gz -C artifacts/win-arm64-emulated
-          if ($LASTEXITCODE) { throw 'Package extraction failed.' }
-          Copy-Item validation/bridge_smoke.exe artifacts/win-arm64-emulated/
+          if (
+            [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture `
+            -ne 'Arm64'
+          ) {
+            throw 'Expected an ARM64 Windows host.'
+          }
+
+          New-Item `
+            -ItemType Directory `
+            -Path artifacts/win-arm64-emulated,packages `
+            -Force | Out-Null
+
+          tar -xzf incoming/fire-user-win-x64.tar.gz `
+            -C artifacts/win-arm64-emulated
+
+          if ($LASTEXITCODE) {
+            throw 'Package extraction failed.'
+          }
+
+          Copy-Item `
+            validation/bridge_smoke.exe `
+            artifacts/win-arm64-emulated/
+
           Push-Location artifacts/win-arm64-emulated
+
           try {
             & ./bridge_smoke.exe
-            if ($LASTEXITCODE) { throw 'Native runtime failed under x64 emulation.' }
+
+            if ($LASTEXITCODE) {
+              throw 'Native runtime failed under x64 emulation.'
+            }
+
             & ./media/ffmpeg.exe -version
-            if ($LASTEXITCODE) { throw 'Media executable failed under x64 emulation.' }
-            $process = Start-Process -FilePath "$PWD/Fire User Connect.exe" -ArgumentList '--startup-smoke-test' -PassThru
-            if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Application startup timed out under x64 emulation.' }
-            if ($process.ExitCode) { throw 'Application startup failed under x64 emulation.' }
+
+            if ($LASTEXITCODE) {
+              throw 'Media executable failed under x64 emulation.'
+            }
+
+            $process = Start-Process `
+              -FilePath "$PWD/Fire User Connect.exe" `
+              -ArgumentList '--startup-smoke-test' `
+              -PassThru
+
+            if (-not $process.WaitForExit(30000)) {
+              $process.Kill()
+              throw 'ARM application startup timed out.'
+            }
+
+            if ($process.ExitCode) {
+              throw 'Application failed under x64 emulation.'
+            }
+
             Remove-Item bridge_smoke.exe
-            'Requires Windows 11 ARM64. This package runs x64 binaries through Windows emulation. It is not a native ARM64 build and does not support Windows 10 ARM.' | Set-Content COMPATIBILITY.txt
-          } finally { Pop-Location }
-          tar -czf packages/fire-user-win-arm64-emulated.tar.gz -C artifacts/win-arm64-emulated .
-          if ($LASTEXITCODE) { throw 'ARM compatibility package archive failed.' }
-      - uses: actions/upload-artifact@v4
+
+            'Requires Windows 11 ARM64. Runs x64 binaries through Windows emulation. Not a native ARM64 build.' |
+              Set-Content COMPATIBILITY.txt
+
+          } finally {
+            Pop-Location
+          }
+
+          tar -czf `
+            packages/fire-user-win-arm64-emulated.tar.gz `
+            -C artifacts/win-arm64-emulated .
+
+          if ($LASTEXITCODE) {
+            throw 'ARM package archive failed.'
+          }
+
+      - name: Upload Windows ARM installers
+        uses: actions/upload-artifact@v4
         with:
           name: fire-user-installers-win-arm64-emulated
           path: installers/*
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload Windows ARM portable package
+        uses: actions/upload-artifact@v4
         with:
           name: fire-user-win-arm64-emulated
           path: packages/fire-user-win-arm64-emulated.tar.gz
           if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  # --------------------------------------------------
+  # Publish verified installers to GitHub Releases
+  # --------------------------------------------------
 
   publish-test-installers:
-    if: github.event_name == 'workflow_dispatch' && inputs.release_run_id != ''
+    name: Publish Fire User installers
+
+    needs:
+      - desktop
+      - windows-arm
+
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request' &&
+      (github.event_name != 'workflow_dispatch' || inputs.target == 'all') &&
+      needs.desktop.result == 'success' &&
+      needs.windows-arm.result == 'success'
+
     runs-on: ubuntu-22.04
+
     permissions:
       actions: read
       contents: write
+
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_RUN: ${{ inputs.release_run_id }}
-      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_TAG: desktop-test-${{ github.run_id }}-${{ github.run_attempt }}
+      RELEASE_COMMIT: ${{ github.sha }}
+
     steps:
-      - name: Verify completed build and pinned draft release
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fire-user-installers-*
+          path: installers
+          merge-multiple: false
+
+      - name: Verify all platform installers
         shell: bash
         run: |
-          python3 - <<'PYTHON'
-          import json, os, re, subprocess
-          repo=os.environ['GITHUB_REPOSITORY'];run=os.environ['RELEASE_RUN'];tag=os.environ['RELEASE_TAG']
-          if not run.isdigit() or not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+-test\.[0-9]{8}',tag):
-              raise SystemExit('Use a numeric run and a test release tag.')
-          def api(path): return json.loads(subprocess.check_output(['gh','api',path],text=True))
-          build=api(f'repos/{repo}/actions/runs/{run}')
-          release=next((item for item in api(f'repos/{repo}/releases?per_page=100') if item['tag_name']==tag),None)
-          if release is None: raise SystemExit('The requested draft release does not exist.')
-          if build['status']!='completed' or build['conclusion']!='success' or build['event'] not in ('push','workflow_dispatch'):
-              raise SystemExit('Only a completed successful trusted build can be published.')
-          if build['head_repository']['full_name']!=repo or release['target_commitish']!=build['head_sha']:
-              raise SystemExit('The release must be pinned to this repository and exact build commit.')
-          if not release['draft'] or not release['prerelease']:
-              raise SystemExit('Publication requires an existing draft test release.')
-          expected={'fire-user-installers-'+rid for rid in ('linux-x64','linux-arm64','win-x64','win-arm64-emulated','osx-x64','osx-arm64')}
-          names={x['name'] for x in api(f'repos/{repo}/actions/runs/{run}/artifacts?per_page=100')['artifacts'] if not x['expired']}
-          if not expected.issubset(names): raise SystemExit('A platform installer artifact is missing.')
-          print('Verified complete platform builds and exact release commit.')
-          PYTHON
-      - name: Download verified installer artifacts
-        run: gh run download "$RELEASE_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'fire-user-installers-*' --dir installers
-      - name: Publish installers and checksums
+          set -euo pipefail
+
+          required=(
+            win-x64
+            win-arm64-emulated
+            linux-x64
+            linux-arm64
+            osx-x64
+            osx-arm64
+          )
+
+          for rid in "${required[@]}"; do
+            directory="installers/fire-user-installers-$rid"
+
+            if [ ! -d "$directory" ]; then
+              echo "::error::Missing platform: $rid"
+              exit 1
+            fi
+
+            if [ -z "$(find "$directory" -type f -print -quit)" ]; then
+              echo "::error::No installers found for $rid"
+              exit 1
+            fi
+
+            echo "Verified installer artifacts for $rid"
+          done
+
+      - name: Prepare release assets and SHA256 checksums
         shell: bash
         run: |
-          python3 - <<'PYTHON'
-          import hashlib, os, pathlib, shutil, subprocess
-          root=pathlib.Path('release-assets');root.mkdir()
-          for path in pathlib.Path('installers').rglob('*'):
-              if path.is_file():
-                  destination=root/path.name
-                  if destination.exists(): raise SystemExit('Duplicate installer asset name: '+path.name)
-                  shutil.copy2(path,destination)
-          files=sorted(root.iterdir())
-          if not files: raise SystemExit('No installers to publish.')
-          manifest=root/'SHA256SUMS.txt'
-          with manifest.open('w') as output:
-              for path in files:
-                  digest=hashlib.sha256()
-                  with path.open('rb') as content:
-                      for block in iter(lambda: content.read(1024*1024),b''): digest.update(block)
-                  output.write(digest.hexdigest()+'  '+path.name+'\n')
-          tag=os.environ['RELEASE_TAG'];repo=os.environ['GITHUB_REPOSITORY']
-          for path in sorted(root.iterdir()):
-              subprocess.run(['gh','release','upload',tag,str(path),'--repo',repo,'--clobber'],check=True)
-          subprocess.run(['gh','release','edit',tag,'--repo',repo,'--draft=false','--prerelease'],check=True)
-          PYTHON
+          set -euo pipefail
+
+          mkdir -p release-assets
+
+          python3 - <<'PY'
+          import hashlib
+          import pathlib
+          import shutil
+
+          source = pathlib.Path("installers")
+          output = pathlib.Path("release-assets")
+
+          files = sorted(
+              p for p in source.rglob("*")
+              if p.is_file()
+          )
+
+          if not files:
+              raise SystemExit("No installers to publish")
+
+          for path in files:
+              destination = output / path.name
+
+              if destination.exists():
+                  raise SystemExit(
+                      f"Duplicate installer name: {path.name}"
+                  )
+
+              shutil.copy2(path, destination)
+
+          manifest = output / "SHA256SUMS.txt"
+
+          with manifest.open("w", encoding="utf-8") as stream:
+              for path in sorted(output.iterdir()):
+                  if not path.is_file() or path == manifest:
+                      continue
+
+                  digest = hashlib.sha256()
+
+                  with path.open("rb") as content:
+                      for block in iter(
+                          lambda: content.read(1024 * 1024),
+                          b""
+                      ):
+                          digest.update(block)
+
+                  stream.write(
+                      f"{digest.hexdigest()}  {path.name}\n"
+                  )
+
+          print("Release assets:")
+          for path in sorted(output.iterdir()):
+              print(f"  {path.name} ({path.stat().st_size} bytes)")
+          PY
+
+      - name: Create GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_COMMIT" \
+            --title "Fire User Desktop - $RELEASE_TAG" \
+            --notes "Automated Fire User Desktop test build.
+
+          Commit: $RELEASE_COMMIT
+          Workflow run: $GITHUB_RUN_ID
+          Attempt: $GITHUB_RUN_ATTEMPT
+
+          Includes verified installers for:
+          - Windows x64
+          - Windows 11 ARM64 (x64 emulation)
+          - Linux x64
+          - Linux ARM64
+          - macOS Intel x64
+          - macOS Apple Silicon ARM64
+
+          SHA256SUMS.txt contains checksums for all installer files.
+
+          These are test installers and may not be code-signed or notarized." \
+            --prerelease \
+            --verify-tag=false
+
+      - name: Upload installers to GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release upload "$RELEASE_TAG" \
+            release-assets/* \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Verify published release files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isPrerelease,assets
+
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json assets \
+            --jq '.assets[].name' \
+            > published-assets.txt
+
+          while IFS= read -r name; do
+            if ! grep -Fxq "$name" published-assets.txt; then
+              echo "::error::Release asset missing: $name"
+              exit 1
+            fi
+          done < <(find release-assets -maxdepth 1 -type f -printf '%f\n')
+
+      - name: Display release download location
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          url=$(gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json url \
+            --jq '.url')
+
+          echo "Published release: $url"
+
+          {
+            echo "## Fire User Desktop installers"
+            echo ""
+            echo "All six platform installer artifact groups were verified."
+            echo ""
+            echo "**Download release:** $url"
+            echo ""
+            echo "**Commit:** \`$RELEASE_COMMIT\`"
+            echo ""
+            echo "**Tag:** \`$RELEASE_TAG\`"
+            echo ""
+            echo "Individual platform artifacts are also available on this workflow run."
+          } >> "$GITHUB_STEP_SUMMARY"
