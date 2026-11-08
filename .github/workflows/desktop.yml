@@ -540,7 +540,7 @@ jobs:
           done
 
           for installer in installers/*.pkg.tar.zst; do
-            tar --zstd -tf "$installer" | grep -Eq '^\./?\.PKGINFO$'
+            tar --zstd -tf "$installer" | grep -Ex '(\./)?\.PKGINFO' > /dev/null
           done
 
           for installer in installers/*.AppImage; do
