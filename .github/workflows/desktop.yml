@@ -37,7 +37,7 @@ permissions:
 jobs:
 
   # ==================================================
-  # PLAN
+  # BUILD MATRIX
   # ==================================================
 
   plan:
@@ -48,7 +48,7 @@ jobs:
       matrix: ${{ steps.select.outputs.matrix }}
 
     steps:
-      - name: Select target platforms
+      - name: Select platforms
         id: select
         shell: bash
         env:
@@ -75,12 +75,12 @@ jobs:
           ]
 
           if not selected:
-              raise SystemExit("Unsupported package target")
-
-          matrix = {"include": selected}
+              raise SystemExit("Unsupported target")
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              output.write("matrix=" + json.dumps(matrix) + "\n")
+              output.write(
+                  "matrix=" + json.dumps({"include": selected}) + "\n"
+              )
           PY
 
   # ==================================================
@@ -88,7 +88,7 @@ jobs:
   # ==================================================
 
   desktop:
-    name: Build and package ${{ matrix.rid }}
+    name: Build ${{ matrix.rid }}
     needs: plan
 
     strategy:
@@ -98,14 +98,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      # ----------------------------------------------
-      # Environment
-      # ----------------------------------------------
-
-      - name: Checkout source
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -115,7 +111,11 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Cache verified macOS media runtime
+      # ----------------------------------------------
+      # macOS cache
+      # ----------------------------------------------
+
+      - name: Restore macOS media cache
         id: media-cache
         if: runner.os == 'macOS'
         uses: actions/cache/restore@v4
@@ -127,7 +127,7 @@ jobs:
       # Linux dependencies
       # ----------------------------------------------
 
-      - name: Install Linux build dependencies
+      - name: Install Linux dependencies
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -154,11 +154,7 @@ jobs:
             desktop-file-utils \
             file
 
-      # ----------------------------------------------
-      # macOS dependencies
-      # ----------------------------------------------
-
-      - name: Install macOS media dependencies
+      - name: Install macOS dependencies
         if: runner.os == 'macOS'
         shell: bash
         run: |
@@ -174,27 +170,22 @@ jobs:
         run: |
           ./scripts/build-native.ps1 -RuntimeIdentifier '${{ matrix.rid }}'
 
-      - name: Build LiveKit bridge on Linux and macOS
+      - name: Build LiveKit bridge on Unix
         if: runner.os != 'Windows'
         shell: bash
         run: |
           python3 scripts/build-native.py --rid '${{ matrix.rid }}'
 
       # ----------------------------------------------
-      # Build tests
+      # Tests
       # ----------------------------------------------
 
       - name: Check build tooling
         shell: bash
         run: |
           set -e
-
           python -m unittest discover -s Tests -p '*Build*Tests.py'
           python -m unittest discover -s Tests -p 'MacBundleTests.py'
-
-      # ----------------------------------------------
-      # Application build
-      # ----------------------------------------------
 
       - name: Build Avalonia application
         shell: bash
@@ -208,34 +199,22 @@ jobs:
         run: |
           Native/media/${{ matrix.rid }}/ffmpeg -version
 
-      # ----------------------------------------------
-      # Linux startup test
-      # ----------------------------------------------
-
-      - name: Linux native startup smoke test
+      - name: Linux startup smoke test
         if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
+          root=$(mktemp -d)
+          trap 'rm -rf "$root"' EXIT
 
-          smoke_root=$(mktemp -d)
-          trap 'rm -rf "$smoke_root"' EXIT
+          mkdir -p "$root/config" "$root/data" "$root/cache"
 
-          mkdir -p \
-            "$smoke_root/config" \
-            "$smoke_root/data" \
-            "$smoke_root/cache"
-
-          XDG_CONFIG_HOME="$smoke_root/config" \
-          XDG_DATA_HOME="$smoke_root/data" \
-          XDG_CACHE_HOME="$smoke_root/cache" \
+          XDG_CONFIG_HOME="$root/config" \
+          XDG_DATA_HOME="$root/data" \
+          XDG_CACHE_HOME="$root/cache" \
           timeout 30s xvfb-run -a \
             "./bin/Release/net10.0/Fire User Connect" \
             --startup-smoke-test
-
-      # ----------------------------------------------
-      # .NET tests
-      # ----------------------------------------------
 
       - name: Run application tests
         shell: bash
@@ -258,30 +237,18 @@ jobs:
         run: |
           dotnet publish UserIdentityDesktop.csproj -c Release -r '${{ matrix.rid }}' --self-contained true -o 'artifacts/${{ matrix.rid }}'
 
-      # ----------------------------------------------
-      # Linux ABI verification
-      # ----------------------------------------------
-
       - name: Verify Linux ABI baseline
         if: runner.os == 'Linux'
         shell: bash
         run: |
           python3 scripts/check-linux-abi.py --source 'artifacts/${{ matrix.rid }}'
 
-      # ----------------------------------------------
-      # Packaged media verification
-      # ----------------------------------------------
-
-      - name: Verify packaged media executable
+      - name: Verify packaged FFmpeg
         shell: bash
         env:
           PACKAGE_RID: ${{ matrix.rid }}
         run: |
           python -c "import os,subprocess; from pathlib import Path; rid=os.environ['PACKAGE_RID']; binary=Path('artifacts')/rid/'media'/('ffmpeg.exe' if rid.startswith('win-') else 'ffmpeg'); subprocess.run([str(binary),'-version'],check=True)"
-
-      # ----------------------------------------------
-      # Windows and macOS startup verification
-      # ----------------------------------------------
 
       - name: Verify Windows and macOS packaged startup
         if: runner.os != 'Linux'
@@ -289,13 +256,12 @@ jobs:
         env:
           PACKAGE_RID: ${{ matrix.rid }}
         run: |
-          $packageRoot = Join-Path $PWD "artifacts/$env:PACKAGE_RID"
+          $root = Join-Path $PWD "artifacts/$env:PACKAGE_RID"
 
-          if ($IsWindows) {
-            $binary = Join-Path $packageRoot 'Fire User Connect.exe'
-          }
-          else {
-            $binary = Join-Path $packageRoot 'Fire User Connect.app/Contents/MacOS/Fire User Connect'
+          $binary = if ($IsWindows) {
+            Join-Path $root 'Fire User Connect.exe'
+          } else {
+            Join-Path $root 'Fire User Connect.app/Contents/MacOS/Fire User Connect'
           }
 
           if (-not (Test-Path $binary)) {
@@ -306,25 +272,216 @@ jobs:
 
           if (-not $process.WaitForExit(30000)) {
             $process.Kill()
-            throw 'Packaged application startup timed out.'
+            throw 'Startup timed out'
           }
 
           if ($process.ExitCode -ne 0) {
-            throw 'Packaged application startup failed.'
+            throw 'Application startup failed'
           }
 
       # ==================================================
-      # GENERATE INSTALLERS
+      # INSTALLER GENERATION
       # ==================================================
 
-      - name: Create OS installers
+      - name: Create native OS installers
         shell: bash
         run: |
           python scripts/build-installers.py --rid '${{ matrix.rid }}' --source 'artifacts/${{ matrix.rid }}' --output installers
 
-      # ----------------------------------------------
-      # Basic installer verification
-      # ----------------------------------------------
+      # ==================================================
+      # UNIVERSAL LINUX INSTALLER
+      # Produces .run without modifying build-installers.py
+      # ==================================================
+
+      - name: Create universal Linux RUN installer
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          PACKAGE_RID: ${{ matrix.rid }}
+        run: |
+          set -euo pipefail
+
+          RID="$PACKAGE_RID"
+
+          if [[ "$RID" == "linux-x64" ]]; then
+            ARCH="x86_64"
+          else
+            ARCH="aarch64"
+          fi
+
+          VERSION=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          root = ET.parse("UserIdentityDesktop.csproj").getroot()
+          version = root.findtext("PropertyGroup/Version", "1.0.0")
+          print(version)
+          PY
+          )
+
+          OUTPUT="installers/FireUserConnect-${VERSION}-${ARCH}.run"
+
+          mkdir -p installers
+
+          WORK=$(mktemp -d)
+          trap 'rm -rf "$WORK"' EXIT
+
+          mkdir -p "$WORK/payload/app"
+          cp -a "artifacts/$RID/." "$WORK/payload/app/"
+
+          cp Assets/Icons/fire-user-connect-256.png \
+            "$WORK/payload/icon.png"
+
+          cat > "$WORK/launcher" <<'INSTALLER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          SELF="$(readlink -f "$0")"
+          PREFIX="${HOME}/.local/opt/fire-user-connect"
+          DESKTOP=1
+          MODE="user"
+
+          usage() {
+            cat <<EOF
+          Fire User Connect Universal Linux Installer
+
+          Options:
+            --user          Install for current user
+            --system        Install to /opt/fire-user-connect
+            --prefix PATH   Custom installation directory
+            --no-desktop    Skip desktop integration
+            --help          Display this help
+
+          Supported architectures: x86_64 and aarch64.
+          A compatible glibc and required host libraries are necessary.
+          EOF
+          }
+
+          while (($#)); do
+            case "$1" in
+              --user)
+                PREFIX="${HOME}/.local/opt/fire-user-connect"
+                MODE="user"
+                shift ;;
+              --system)
+                PREFIX="/opt/fire-user-connect"
+                MODE="system"
+                shift ;;
+              --prefix)
+                (($# >= 2)) || {
+                  echo "Missing prefix path" >&2
+                  exit 1
+                }
+                PREFIX="$2"
+                shift 2 ;;
+              --no-desktop)
+                DESKTOP=0
+                shift ;;
+              --help)
+                usage
+                exit 0 ;;
+              *)
+                echo "Unknown option: $1" >&2
+                exit 1 ;;
+            esac
+          done
+
+          case "$PREFIX" in
+            /*) ;;
+            *)
+              echo "Installation path must be absolute" >&2
+              exit 1 ;;
+          esac
+
+          PREFIX="${PREFIX%/}"
+
+          if [[ -z "$PREFIX" || "$PREFIX" == "/" ]]; then
+            echo "Unsafe installation directory" >&2
+            exit 1
+          fi
+
+          if [[ "$MODE" == "system" ]]; then
+            if (( EUID != 0 )); then
+              echo "System installation requires root privileges" >&2
+              exit 1
+            fi
+            SHARE="/usr/local/share"
+          else
+            SHARE="${XDG_DATA_HOME:-$HOME/.local/share}"
+          fi
+
+          TMP="$(mktemp -d)"
+          trap 'rm -rf "$TMP"' EXIT
+
+          LINE=$(awk '/^__FIREUSER_PAYLOAD__$/ {
+            print NR + 1
+            exit
+          }' "$SELF")
+
+          if [[ -z "$LINE" ]]; then
+            echo "Installer payload missing" >&2
+            exit 1
+          fi
+
+          tail -n +"$LINE" "$SELF" | tar -xz -C "$TMP"
+
+          if [[ ! -x "$TMP/app/Fire User Connect" ]]; then
+            echo "Application executable missing" >&2
+            exit 1
+          fi
+
+          mkdir -p "$PREFIX"
+          cp -a "$TMP/app/." "$PREFIX/"
+
+          chmod +x "$PREFIX/Fire User Connect"
+
+          if [[ -f "$PREFIX/media/ffmpeg" ]]; then
+            chmod +x "$PREFIX/media/ffmpeg"
+          fi
+
+          if (( DESKTOP )); then
+            APPDIR="$SHARE/applications"
+            ICONDIR="$SHARE/icons/hicolor/256x256/apps"
+
+            mkdir -p "$APPDIR" "$ICONDIR"
+
+            cp "$TMP/icon.png" \
+              "$ICONDIR/fire-user-connect.png"
+
+            cat > "$APPDIR/fire-user-connect.desktop" <<EOF
+          [Desktop Entry]
+          Type=Application
+          Name=Fire User Connect
+          Comment=Fire User native collaboration client
+          Exec="$PREFIX/Fire User Connect" --open-chat %u
+          TryExec=$PREFIX/Fire User Connect
+          Icon=fire-user-connect
+          Terminal=false
+          Categories=Network;Chat;
+          MimeType=x-scheme-handler/fireuserconnect;
+          EOF
+
+            if command -v update-desktop-database >/dev/null 2>&1; then
+              update-desktop-database "$APPDIR" || true
+            fi
+          fi
+
+          echo "Fire User Connect installed to: $PREFIX"
+          exit 0
+          __FIREUSER_PAYLOAD__
+          INSTALLER
+
+          tar -czf "$WORK/payload.tar.gz" -C "$WORK/payload" .
+
+          cat "$WORK/launcher" "$WORK/payload.tar.gz" > "$OUTPUT"
+
+          chmod +x "$OUTPUT"
+
+          test -s "$OUTPUT"
+
+          echo "Generated universal installer: $OUTPUT"
+
+      # ==================================================
+      # INSTALLER VERIFICATION
+      # ==================================================
 
       - name: Verify installer output
         shell: bash
@@ -332,21 +489,16 @@ jobs:
           set -euo pipefail
 
           if [ ! -d installers ]; then
-            echo "::error::Installer directory missing."
+            echo "::error::Installer directory missing"
             exit 1
           fi
 
           if [ -z "$(find installers -type f -print -quit)" ]; then
-            echo "::error::No installer files generated."
+            echo "::error::No installer files generated"
             exit 1
           fi
 
-          echo "Generated installers:"
           find installers -type f -print
-
-      # ----------------------------------------------
-      # Linux installer format verification
-      # ----------------------------------------------
 
       - name: Verify all Linux installer formats
         if: runner.os == 'Linux'
@@ -365,15 +517,7 @@ jobs:
             DEB_ARCH="arm64"
           fi
 
-          required_formats=(
-            deb
-            rpm
-            pkg.tar.zst
-            AppImage
-            run
-          )
-
-          for extension in "${required_formats[@]}"; do
+          for extension in deb rpm pkg.tar.zst AppImage run; do
             files=(installers/*."$extension")
 
             if (( ${#files[@]} == 0 )); then
@@ -387,32 +531,39 @@ jobs:
             done
           done
 
-          # Verify Debian package architecture
           for installer in installers/*.deb; do
             test "$(dpkg-deb -f "$installer" Architecture)" = "$DEB_ARCH"
           done
 
-          # Verify RPM package architecture and metadata
           for installer in installers/*.rpm; do
             test "$(rpm -qp --qf '%{ARCH}' "$installer")" = "$ARCH"
           done
 
-          # Verify Arch Linux package archive
           for installer in installers/*.pkg.tar.zst; do
             tar --zstd -tf "$installer" | grep -Eq '^\./?\.PKGINFO$'
           done
 
-          # Verify AppImage file signatures
           for installer in installers/*.AppImage; do
             file "$installer" | grep -q ELF
           done
 
-          # Verify universal Linux installer help
           for installer in installers/*.run; do
             bash "$installer" --help
+
+            TEST_ROOT=$(mktemp -d)
+            trap 'rm -rf "$TEST_ROOT"' EXIT
+
+            bash "$installer" \
+              --prefix "$TEST_ROOT/fire-user" \
+              --no-desktop
+
+            test -x "$TEST_ROOT/fire-user/Fire User Connect"
+
+            rm -rf "$TEST_ROOT"
+            trap - EXIT
           done
 
-          echo "All Linux package formats verified for $RID"
+          echo "All five installer formats verified for $RID"
 
       # ==================================================
       # UPLOAD INSTALLER ARTIFACTS
@@ -431,15 +582,14 @@ jobs:
       # PORTABLE APPLICATION ARCHIVES
       # ==================================================
 
-      - name: Archive Unix application
+      - name: Archive Unix portable application
         if: runner.os != 'Windows'
         shell: bash
         run: |
           mkdir -p packages
-
           tar -czf 'packages/fire-user-${{ matrix.rid }}.tar.gz' -C 'artifacts/${{ matrix.rid }}' .
 
-      - name: Archive Windows application
+      - name: Archive Windows portable application
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -448,7 +598,7 @@ jobs:
           tar -czf 'packages/fire-user-${{ matrix.rid }}.tar.gz' -C 'artifacts/${{ matrix.rid }}' .
 
           if ($LASTEXITCODE -ne 0) {
-            throw 'Windows package archive failed.'
+            throw 'Package archive failed'
           }
 
       - name: Upload portable application
@@ -461,7 +611,7 @@ jobs:
           compression-level: 0
 
       # ==================================================
-      # WINDOWS ARM64 COMPATIBILITY PREPARATION
+      # WINDOWS ARM COMPATIBILITY PREPARATION
       # ==================================================
 
       - name: Upload Windows native validation executable
@@ -479,7 +629,7 @@ jobs:
         run: |
           python scripts/build-installers.py --rid win-arm64-emulated --source artifacts/win-x64 --output arm-installers
 
-      - name: Stage Windows ARM installer for verification
+      - name: Stage Windows ARM installer
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
@@ -488,11 +638,11 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # ----------------------------------------------
-      # macOS media cache
-      # ----------------------------------------------
+      # ==================================================
+      # MACOS CACHE
+      # ==================================================
 
-      - name: Save macOS media runtime cache
+      - name: Save verified macOS media runtime
         if: >-
           always() &&
           runner.os == 'macOS' &&
@@ -504,14 +654,12 @@ jobs:
           key: source-media-${{ matrix.rid }}-${{ hashFiles('scripts/media-runtimes.json', 'scripts/build-native.py') }}
 
   # ==================================================
-  # WINDOWS ARM64 VALIDATION
+  # WINDOWS ARM64 VERIFICATION
   # ==================================================
 
   windows-arm:
     name: Windows 11 ARM64 compatibility
-
-    needs:
-      - desktop
+    needs: desktop
 
     if: >-
       github.event_name != 'workflow_dispatch' ||
@@ -521,13 +669,13 @@ jobs:
     runs-on: windows-11-arm
 
     steps:
-      - name: Download Windows x64 portable package
+      - name: Download Windows x64 package
         uses: actions/download-artifact@v4
         with:
           name: fire-user-win-x64
           path: incoming
 
-      - name: Download native validation executable
+      - name: Download Windows validation executable
         uses: actions/download-artifact@v4
         with:
           name: native-validation-win-x64
@@ -543,7 +691,7 @@ jobs:
         shell: pwsh
         run: |
           if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'Arm64') {
-            throw 'Expected Windows ARM64 runner.'
+            throw 'Expected ARM64 host'
           }
 
           New-Item -ItemType Directory -Path artifacts/win-arm64-emulated,packages -Force | Out-Null
@@ -551,7 +699,7 @@ jobs:
           tar -xzf incoming/fire-user-win-x64.tar.gz -C artifacts/win-arm64-emulated
 
           if ($LASTEXITCODE -ne 0) {
-            throw 'Package extraction failed.'
+            throw 'Package extraction failed'
           }
 
           Copy-Item validation/bridge_smoke.exe artifacts/win-arm64-emulated/
@@ -562,29 +710,29 @@ jobs:
             & ./bridge_smoke.exe
 
             if ($LASTEXITCODE -ne 0) {
-              throw 'Native runtime failed under x64 emulation.'
+              throw 'Native runtime failed'
             }
 
             & ./media/ffmpeg.exe -version
 
             if ($LASTEXITCODE -ne 0) {
-              throw 'FFmpeg failed under x64 emulation.'
+              throw 'FFmpeg failed'
             }
 
             $process = Start-Process -FilePath "$PWD/Fire User Connect.exe" -ArgumentList '--startup-smoke-test' -PassThru
 
             if (-not $process.WaitForExit(30000)) {
               $process.Kill()
-              throw 'Windows ARM application startup timed out.'
+              throw 'ARM startup timed out'
             }
 
             if ($process.ExitCode -ne 0) {
-              throw 'Windows ARM application startup failed.'
+              throw 'ARM startup failed'
             }
 
             Remove-Item bridge_smoke.exe
 
-            'Requires Windows 11 ARM64. Runs x64 binaries through Windows emulation. Not a native ARM64 build.' |
+            'Requires Windows 11 ARM64; runs x64 binaries through emulation.' |
               Set-Content COMPATIBILITY.txt
 
           } finally {
@@ -594,10 +742,10 @@ jobs:
           tar -czf packages/fire-user-win-arm64-emulated.tar.gz -C artifacts/win-arm64-emulated .
 
           if ($LASTEXITCODE -ne 0) {
-            throw 'ARM package archive failed.'
+            throw 'ARM archive failed'
           }
 
-      - name: Upload verified Windows ARM installers
+      - name: Upload verified ARM installers
         uses: actions/upload-artifact@v4
         with:
           name: fire-user-installers-win-arm64-emulated
@@ -606,7 +754,7 @@ jobs:
           retention-days: 30
           compression-level: 0
 
-      - name: Upload Windows ARM portable package
+      - name: Upload ARM portable package
         uses: actions/upload-artifact@v4
         with:
           name: fire-user-win-arm64-emulated
@@ -616,11 +764,11 @@ jobs:
           compression-level: 0
 
   # ==================================================
-  # AUTOMATIC GITHUB PRERELEASE PUBLICATION
+  # AUTOMATIC GITHUB RELEASE
   # ==================================================
 
   publish-test-installers:
-    name: Publish verified Fire User installers
+    name: Publish verified installers
 
     needs:
       - desktop
@@ -648,18 +796,18 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      # ----------------------------------------------
-      # Collect all platform installers
-      # ----------------------------------------------
-
-      - name: Download verified installer artifacts
+      - name: Download all installer artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: fire-user-installers-*
           path: installers
           merge-multiple: false
 
-      - name: Verify all six platform groups
+      # ----------------------------------------------
+      # Validate required platforms
+      # ----------------------------------------------
+
+      - name: Verify all platform installer groups
         shell: bash
         run: |
           set -euo pipefail
@@ -677,23 +825,23 @@ jobs:
             directory="installers/fire-user-installers-$rid"
 
             if [ ! -d "$directory" ]; then
-              echo "::error::Missing installer group: $rid"
+              echo "::error::Missing platform: $rid"
               exit 1
             fi
 
             if [ -z "$(find "$directory" -type f -print -quit)" ]; then
-              echo "::error::No installer files for $rid"
+              echo "::error::No installers found for $rid"
               exit 1
             fi
 
-            echo "Verified platform: $rid"
+            echo "Verified: $rid"
           done
 
       # ----------------------------------------------
-      # Prepare release files
+      # Prepare release assets
       # ----------------------------------------------
 
-      - name: Prepare release assets and SHA256 checksums
+      - name: Prepare installers and SHA256 checksums
         shell: bash
         run: |
           set -euo pipefail
@@ -709,33 +857,33 @@ jobs:
           output = pathlib.Path("release-assets")
 
           files = sorted(
-              path for path in source.rglob("*")
-              if path.is_file()
+              item for item in source.rglob("*")
+              if item.is_file()
           )
 
           if not files:
-              raise SystemExit("No installers available")
+              raise SystemExit("No installers found")
 
-          for path in files:
-              destination = output / path.name
+          for item in files:
+              destination = output / item.name
 
               if destination.exists():
                   raise SystemExit(
-                      f"Duplicate installer filename: {path.name}"
+                      f"Duplicate installer filename: {item.name}"
                   )
 
-              shutil.copy2(path, destination)
+              shutil.copy2(item, destination)
 
           manifest = output / "SHA256SUMS.txt"
 
           with manifest.open("w", encoding="utf-8") as stream:
-              for path in sorted(output.iterdir()):
-                  if not path.is_file() or path == manifest:
+              for item in sorted(output.iterdir()):
+                  if item == manifest or not item.is_file():
                       continue
 
                   digest = hashlib.sha256()
 
-                  with path.open("rb") as content:
+                  with item.open("rb") as content:
                       for block in iter(
                           lambda: content.read(1024 * 1024),
                           b""
@@ -743,13 +891,11 @@ jobs:
                           digest.update(block)
 
                   stream.write(
-                      f"{digest.hexdigest()}  {path.name}\n"
+                      f"{digest.hexdigest()}  {item.name}\n"
                   )
 
-          print("Release assets:")
-
-          for path in sorted(output.iterdir()):
-              print(path.name, path.stat().st_size, "bytes")
+          for item in sorted(output.iterdir()):
+              print(item.name, item.stat().st_size, "bytes")
           PY
 
       # ----------------------------------------------
@@ -771,20 +917,22 @@ jobs:
           Workflow: $GITHUB_RUN_ID
           Attempt: $GITHUB_RUN_ATTEMPT
 
-          Platforms:
-          - Windows x64
-          - Windows 11 ARM64 (x64 emulation)
-          - Linux x64
-          - Linux ARM64
-          - macOS Intel x64
-          - macOS Apple Silicon ARM64
+          Supported packages:
 
-          Linux installer formats:
-          - Debian DEB
-          - RPM
-          - Arch Linux package
-          - AppImage
-          - Universal Linux RUN
+          Windows:
+          - Windows x64
+          - Windows 11 ARM64 via x64 emulation
+
+          macOS:
+          - Intel x64
+          - Apple Silicon ARM64
+
+          Linux x64 and ARM64:
+          - Debian .deb
+          - RPM .rpm
+          - Arch .pkg.tar.zst
+          - Portable .AppImage
+          - Universal .run installer
 
           SHA256SUMS.txt contains installer checksums.
 
@@ -793,7 +941,7 @@ jobs:
             --prerelease
 
       # ----------------------------------------------
-      # Upload release assets
+      # Upload every installer
       # ----------------------------------------------
 
       - name: Upload installers to GitHub Release
@@ -806,10 +954,10 @@ jobs:
             --repo "$GITHUB_REPOSITORY"
 
       # ----------------------------------------------
-      # Verify published assets before going public
+      # Verify release assets
       # ----------------------------------------------
 
-      - name: Verify release assets
+      - name: Verify release uploads
         shell: bash
         run: |
           set -euo pipefail
@@ -832,10 +980,10 @@ jobs:
               -printf '%f\n'
           )
 
-          echo "All release files verified."
+          echo "All release assets verified"
 
       # ----------------------------------------------
-      # Publish release only after verification
+      # Publish prerelease
       # ----------------------------------------------
 
       - name: Publish verified prerelease
@@ -849,10 +997,10 @@ jobs:
             --prerelease
 
       # ----------------------------------------------
-      # Display download links
+      # Show download link
       # ----------------------------------------------
 
-      - name: Show installer download location
+      - name: Display release download location
         shell: bash
         run: |
           set -euo pipefail
@@ -867,13 +1015,13 @@ jobs:
           {
             echo "## Fire User Desktop installers"
             echo ""
-            echo "All required installer artifacts passed verification."
+            echo "All platform installer groups were verified."
             echo ""
             echo "**Download release:** $URL"
             echo ""
             echo "**Commit:** \`$RELEASE_COMMIT\`"
             echo ""
-            echo "**Release tag:** \`$RELEASE_TAG\`"
+            echo "**Tag:** \`$RELEASE_TAG\`"
             echo ""
-            echo "Individual installers and portable packages are also available under this workflow run's Artifacts section."
+            echo "Installers and portable archives are also available under this workflow run's Artifacts."
           } >> "$GITHUB_STEP_SUMMARY"
