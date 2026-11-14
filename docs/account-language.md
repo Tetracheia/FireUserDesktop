@@ -23,3 +23,6 @@ Documentation impact: functional requirements, non-functional requirements,
 conceptual schema, sequences, use cases and traceability were reviewed unchanged;
 this was a local launcher repair. Full signed-in workflows and startup after a
 fresh login/reboot were not checked.
+
+
+2026-11-14: preference requests now use `/api/ProfileSettings/appearance/preferences`; the backend keeps the former workplace URL as a compatibility alias. Interface behavior, payloads, storage and owner-targeted refresh are unchanged. Requirements, conceptual schema, sequences and use cases reviewed unchanged for this client route migration; contract/traceability updates are in backend docs/account-appearance.md.

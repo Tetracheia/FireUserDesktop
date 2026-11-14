@@ -34,7 +34,7 @@ public sealed class WorkplaceApiUpdateTests
         var (api,sent)=Create();await api.AppearanceAsync(TestContext.Current.CancellationToken);
         await api.SaveAppearanceAsync(new(null,27),TestContext.Current.CancellationToken);
         Assert.Equal(HttpMethod.Get,sent[0].Method);Assert.Null(sent[0].Body);
-        Assert.Equal(HttpMethod.Post,sent[1].Method);Assert.Equal("/api/Workplace/appearance/preferences",sent[1].Path);
+        Assert.Equal(HttpMethod.Post,sent[1].Method);Assert.Equal("/api/ProfileSettings/appearance/preferences",sent[1].Path);
         Assert.All(sent,item=>Assert.Equal("session",item.Bearer));
         var body=sent[1].Body!.Value;Assert.Equal(27,body.GetProperty("brightness").GetInt32());
         Assert.True(!body.TryGetProperty("twelveHour",out var clock)||clock.ValueKind==JsonValueKind.Null);
