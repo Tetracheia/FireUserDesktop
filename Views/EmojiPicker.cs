@@ -22,7 +22,7 @@ public sealed class EmojiPicker : UserControl
     {
         Width=340;
         var root=new StackPanel { Spacing=12 };
-        root.Children.Add(new TextBlock {Text="Emojis",FontSize=17,FontWeight=FontWeight.SemiBold});root.Children.Add(search);
+        root.Children.Add(new TextBlock {[!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Emojis"),FontSize=17,FontWeight=FontWeight.SemiBold});root.Children.Add(search);
         var categories=new WrapPanel { ItemSpacing=6,LineSpacing=6 };
         foreach(var name in new[]{"All","Faces","Gestures","Symbols"}) {var button=new Button {Content=name,Padding=new Thickness(8,5)};button.Click+=(_,_)=>{category=name;Refresh();};categories.Children.Add(button);}
         root.Children.Add(categories);root.Children.Add(empty);root.Children.Add(new ScrollViewer {Content=choices,MaxHeight=240,HorizontalScrollBarVisibility=Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled});Content=root;

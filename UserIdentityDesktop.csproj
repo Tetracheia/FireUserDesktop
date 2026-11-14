@@ -23,6 +23,7 @@
     <Compile Remove="Service\**" />
     <Compile Remove="Tests\**" />
     <AvaloniaResource Include="Assets\**" />
+    <EmbeddedResource Include="Localization/labels.json" />
     <Content Include="sounds/*.mp3" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 

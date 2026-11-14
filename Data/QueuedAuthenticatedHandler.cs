@@ -25,6 +25,8 @@ internal sealed class QueuedAuthenticatedHandler(IBackendActionQueue queue,Func<
         var bearer=await credential();timeout.Token.ThrowIfCancellationRequested();
         if(sameAccount?.Invoke()==false)throw new OperationCanceledException("This action belongs to a previous account.");
         if(string.IsNullOrEmpty(bearer))throw new InvalidOperationException("Your session expired. Sign in again before submitting this action.");
+        request.Headers.AcceptLanguage.Clear();
+        request.Headers.AcceptLanguage.ParseAdd(UserIdentityDesktop.Core.Locale.LocaleCatalog.Current);
         request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",bearer);
         try{return await sender.SendAsync(request,timeout.Token);}
         catch(OperationCanceledException error) when(!token.IsCancellationRequested)

@@ -36,9 +36,9 @@ internal static class MessageMenus
         else if (item.CanJoinCall) menu.Items.Add(Async("Join call", async () => { if (model.Workspace != null) await model.Workspace.JoinExistingCallAsync(item.Message.CallSummary!.CallId); }));
         if (item.HasAttachments)
         {
-            var download = new MenuItem { Header = "Download attachment" };
+            var download = new MenuItem { [!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Download attachment") };
             foreach (var attachment in item.Attachments) download.Items.Add(new MenuItem { Header = attachment.FileName, Command = attachment.DownloadCommand });
-            menu.Items.Add(new MenuItem { Header = "Download All", Command = item.DownloadAllCommand });
+            menu.Items.Add(new MenuItem { [!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Download All"), Command = item.DownloadAllCommand });
             menu.Items.Add(download);
         }
         menu.Items.Add(new Separator());

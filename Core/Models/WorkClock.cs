@@ -3,8 +3,8 @@ namespace UserIdentityDesktop.Core.Models;
 public static class WorkClock
 {
     public static bool TwelveHour { get; set; }
-    public static string DateTime(System.DateTime value) => value.ToString("d MMM yyyy", System.Globalization.CultureInfo.CurrentCulture)+" "+Time(value);
-    public static string Time(DateTime value) => value.ToString(TwelveHour ? "h:mm tt" : "HH:mm", System.Globalization.CultureInfo.CurrentCulture);
+    public static string DateTime(System.DateTime value) => value.ToString("d MMM yyyy", UserIdentityDesktop.Core.Locale.LocaleCatalog.DisplayCulture)+" "+Time(value);
+    public static string Time(DateTime value) => value.ToString(TwelveHour ? "h:mm tt" : "HH:mm", UserIdentityDesktop.Core.Locale.LocaleCatalog.DisplayCulture);
 }
 public sealed record WorkTimeZoneOption(string Id, string Name, bool SupportsDaylightSavingTime, bool IsDaylightSavingTime, int OffsetMinutes)
 {

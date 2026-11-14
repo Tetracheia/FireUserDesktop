@@ -32,8 +32,8 @@ public sealed class InlineVideoPlayer : UserControl
     public event Action? FullscreenRequested;
     public InlineVideoPlayer()
     {
-        var fullscreen = new Button { Content = "Fullscreen", Classes = { "quiet" } }; fullscreen.Click += (_, _) => FullscreenRequested?.Invoke();
-        var stopButton = new Button { Content = "Stop", Classes = { "quiet" } };
+        var fullscreen = new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Fullscreen"), Classes = { "quiet" } }; fullscreen.Click += (_, _) => FullscreenRequested?.Invoke();
+        var stopButton = new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Stop"), Classes = { "quiet" } };
         stopButton.Click += async (_, _) => { await PauseAsync(); position=0; seeking=false; };
         var volumeSlider = new Slider { Minimum=0, Maximum=100, Value=100, Width=95 };
         Avalonia.Automation.AutomationProperties.SetName(volumeSlider, "Video volume");

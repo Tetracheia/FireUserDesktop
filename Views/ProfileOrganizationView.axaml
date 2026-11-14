@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl FlowDirection="{ReflectionBinding Direction, Source={x:Static loc:LocalizedStrings.Shared}}" xmlns="https://github.com/avaloniaui" xmlns:loc="using:UserIdentityDesktop.Localization" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:UserIdentityDesktop.ViewModels" x:Class="UserIdentityDesktop.Views.ProfileOrganizationView"
              x:DataType="vm:ProfileOrganizationViewModel">
   <UserControl.Resources>
@@ -16,7 +16,7 @@
     <Style Selector="Border.hierarchy-node.current"><Setter Property="Background" Value="{DynamicResource ForgePrimaryGradientSubtle}" /><Setter Property="BorderBrush" Value="{DynamicResource ForgePrimary}" /></Style>
     <Style Selector="Expander"><Setter Property="HorizontalAlignment" Value="Stretch" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /><Setter Property="FontSize" Value="13" /></Style>
   </UserControl.Styles>
-  <StackPanel Spacing="14" AutomationProperties.Name="Organization directory">
+  <StackPanel Spacing="14" AutomationProperties.Name="{loc:Translate loc_aaf862d15dda}">
     <Border Classes="detail-card">
       <StackPanel Spacing="14">
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
@@ -25,23 +25,23 @@
         </Grid>
         <Border Height="1" Background="{DynamicResource ForgeBorder}" />
         <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-          <StackPanel Spacing="5"><TextBlock Text="Position" Classes="caption" /><TextBlock Text="{Binding Position}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Classification}" FontSize="11" Foreground="{DynamicResource ForgeTextSecondary}" TextWrapping="Wrap" /></StackPanel>
-          <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Department / unit" Classes="caption" /><TextBlock Text="{Binding Department}" TextWrapping="Wrap" /></StackPanel>
+          <StackPanel Spacing="5"><TextBlock Text="{loc:Translate loc_6d031af10da7}" Classes="caption" /><TextBlock Text="{Binding Position}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Classification}" FontSize="11" Foreground="{DynamicResource ForgeTextSecondary}" TextWrapping="Wrap" /></StackPanel>
+          <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="{loc:Translate loc_d457f3652786}" Classes="caption" /><TextBlock Text="{Binding Department}" TextWrapping="Wrap" /></StackPanel>
         </Grid>
       </StackPanel>
     </Border>
     <StackPanel Spacing="9">
-      <TextBlock Text="REPORTING TO" Classes="section-label" />
+      <TextBlock Text="{loc:Translate loc_51e96b1e314b}" Classes="section-label" />
       <TextBlock Text="{Binding ManagerStatus}" Foreground="{DynamicResource ForgeTextSecondary}" IsVisible="{Binding !HasManagers}" TextWrapping="Wrap" />
       <ItemsControl x:Name="ReportingManagers" ItemsSource="{Binding Managers}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ProfileManager">
         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,3"><Border Width="32" Height="32" CornerRadius="16" Background="{DynamicResource ForgePrimaryGradientSubtle}"><TextBlock Text="{Binding Initials}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource ForgePrimary}" /></Border><StackPanel Grid.Column="1" Spacing="3"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Position}" Classes="caption" TextWrapping="Wrap" /></StackPanel></Grid>
       </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-      <TextBlock Text="First 50 occupants shown." Classes="caption" IsVisible="{Binding ManagersHaveMore}" />
+      <TextBlock Text="{loc:Translate loc_990be6aa0ff9}" Classes="caption" IsVisible="{Binding ManagersHaveMore}" />
     </StackPanel>
-    <Expander x:Name="DepartmentHierarchy" Header="Department hierarchy" IsVisible="{Binding HasDepartments}">
+    <Expander x:Name="DepartmentHierarchy" Header="{loc:Translate loc_c9df4a882cd1}" IsVisible="{Binding HasDepartments}">
       <ItemsControl x:Name="DepartmentNodes" ItemsSource="{Binding Departments}" ItemTemplate="{StaticResource HierarchyNode}" Margin="0,8,0,0" />
     </Expander>
-    <Expander x:Name="ReportingHierarchy" Header="Reporting hierarchy" IsExpanded="True" IsVisible="{Binding HasReporting}">
+    <Expander x:Name="ReportingHierarchy" Header="{loc:Translate loc_412e8838e932}" IsExpanded="True" IsVisible="{Binding HasReporting}">
       <ItemsControl x:Name="ReportingNodes" ItemsSource="{Binding Reporting}" ItemTemplate="{StaticResource HierarchyNode}" Margin="0,8,0,0" />
     </Expander>
   </StackPanel>

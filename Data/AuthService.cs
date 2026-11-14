@@ -135,6 +135,7 @@ public class AuthService : IAuthService
         AccessToken = null;
         RefreshToken = null;
         CurrentUser = null;
+        UserIdentityDesktop.Core.Locale.LocaleCatalog.Set("en");
         _configService.SavedRefreshToken = null;
 
         CurrentUserChanged?.Invoke(null);

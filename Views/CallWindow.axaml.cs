@@ -213,8 +213,8 @@ public partial class CallWindow : Window
         menu.Items.Add(new MenuItem { Header = tile.IsScreen ? "Focus screen share" : "Focus participant", Command = observedModel.FocusVideoCommand, CommandParameter = tile });
         if (tile.IsScreen) menu.Items.Add(new MenuItem { Header = presentationFullscreen ? "Exit full screen" : "Full screen", Command = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { if (presentationFullscreen) ExitShareFullscreen(); else { observedModel.FocusedVideo = tile; ToggleShareFullscreen(); } }) });
         if (tile.IsScreen && !tile.Identity.StartsWith("You · ",StringComparison.Ordinal))
-            menu.Items.Add(new MenuItem { Header = "Request remote control", Command = observedModel.RequestScreenControlCommand, CommandParameter = tile });
-        menu.Items.Add(new MenuItem { Header = "Return to gallery", Command = observedModel.ClearVideoFocusCommand });
+            menu.Items.Add(new MenuItem { [!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Request remote control"), Command = observedModel.RequestScreenControlCommand, CommandParameter = tile });
+        menu.Items.Add(new MenuItem { [!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Return to gallery"), Command = observedModel.ClearVideoFocusCommand });
         MessageMenus.Open(target,menu,atPointer);
     }
     private void ScrollCallChat() => Dispatcher.UIThread.Post(() =>

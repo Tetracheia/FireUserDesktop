@@ -77,10 +77,17 @@ public partial class ChatView : UserControl
     {
         if (model == null || sender is not Control target) return;
         var menu = new ContextMenu();
-        menu.Items.Add(new MenuItem { Header = "My profile", Command = model.OpenMyProfileCommand });
+        menu.Items.Add(new MenuItem { [!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("My profile"), Command = model.OpenMyProfileCommand });
         if(model.Workspace is {} workspace)
         {
-            var clock=new MenuItem { Header="Time format" };
+            var language=new MenuItem { [!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Language") };
+            foreach(var pair in new[]{("en","English"),("ar","العربية"),("el","Ελληνικά")})
+            {
+                var choice=new MenuItem { Header=pair.Item2,ToggleType=MenuItemToggleType.Radio,IsChecked=workspace.Appearance.Locale==pair.Item1 };
+                choice.Click+=(_,_)=>workspace.Appearance.Locale=pair.Item1;language.Items.Add(choice);
+            }
+            menu.Items.Add(language);
+            var clock=new MenuItem { [!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Time format") };
             foreach(var value in new[]{true,false})
             {
                 var choice=new MenuItem { Header=value?"12-hour (AM/PM)":"24-hour", ToggleType=MenuItemToggleType.Radio, IsChecked=workspace.Clock.TwelveHour==value };
@@ -88,7 +95,7 @@ public partial class ChatView : UserControl
             }
             menu.Items.Add(clock);
             var appearance=new StackPanel { Spacing=8, Width=180, Margin=new Thickness(6) };
-            appearance.Children.Add(new TextBlock { Text="Dark to light",FontSize=12 });
+            appearance.Children.Add(new TextBlock { [!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Dark to light"),FontSize=12 });
             var slider=new Slider { Minimum=0,Maximum=100,TickFrequency=1,IsSnapToTickEnabled=true };
             slider.AddHandler(Avalonia.Input.InputElement.PointerPressedEvent,(_,_)=>workspace.Appearance.BeginAdjusting(),Avalonia.Interactivity.RoutingStrategies.Tunnel);
             slider.AddHandler(Avalonia.Input.InputElement.PointerReleasedEvent,(_,_)=>_ = workspace.Appearance.EndAdjustingAsync(),Avalonia.Interactivity.RoutingStrategies.Tunnel);
@@ -100,13 +107,13 @@ public partial class ChatView : UserControl
             Avalonia.Automation.AutomationProperties.SetName(slider,"Appearance brightness");appearance.Children.Add(slider);
             var feedback=new TextBlock { TextWrapping=Avalonia.Media.TextWrapping.Wrap,FontSize=11 };
             feedback.Bind(TextBlock.TextProperty,new Avalonia.Data.Binding("Status") {Source=workspace.Appearance});appearance.Children.Add(feedback);
-            var appearanceMenu=new MenuItem {Header="Appearance"};
+            var appearanceMenu=new MenuItem {[!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Appearance")};
             appearanceMenu.Items.Add(new MenuItem { Header=appearance,StaysOpenOnClick=true });menu.Items.Add(appearanceMenu);
         }
-        var status = new MenuItem { Header = "Availability" };
+        var status = new MenuItem { [!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Availability") };
         foreach (var option in model.StatusOptions) status.Items.Add(new MenuItem { Header = option.Label, Icon=new PresenceIndicator {Status=option.Status,Width=18,Height=18}, Command = model.SetStatusCommand, CommandParameter = option.Status });
         menu.Items.Add(status); menu.Items.Add(new Separator());
-        menu.Items.Add(new MenuItem { Header = "Sign out", Command = model.LogoutCommand }); MessageMenus.Open(target, menu, false);
+        menu.Items.Add(new MenuItem { [!MenuItem.HeaderProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Sign out"), Command = model.LogoutCommand }); MessageMenus.Open(target, menu, false);
     }
     public ChatView()
     {

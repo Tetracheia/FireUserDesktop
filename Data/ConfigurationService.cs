@@ -7,7 +7,7 @@ namespace UserIdentityDesktop.Data;
 
 public class AppConfig
 {
-    public string ServerUrl { get; set; } = "http://34.34.49.52:5000";
+    public string ServerUrl { get; set; } = "https://backend.fireuser.net";
     public string? SavedRefreshToken { get; set; }
     public string? SavedEmail { get; set; }
     public bool IsDarkMode { get; set; } = true;

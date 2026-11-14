@@ -42,18 +42,18 @@ internal sealed class VacationReviewWindow : Window
             for(var i=0;i<balanceCards.Count;i++){Grid.SetColumn(balanceCards[i],i%columns);Grid.SetRow(balanceCards[i],i/columns);}
         }
         ArrangeBalances();SizeChanged+=(_,_)=>ArrangeBalances();
-        if(!string.IsNullOrWhiteSpace(reason))body.Children.Add(new StackPanel{Spacing=4,Children={new TextBlock{Text="Reason",FontWeight=FontWeight.SemiBold},new TextBlock{Text=reason,TextWrapping=TextWrapping.Wrap}}});
-        body.Children.Add(new TextBlock{Text="Selected shifts",FontSize=16,FontWeight=FontWeight.SemiBold});
+        if(!string.IsNullOrWhiteSpace(reason))body.Children.Add(new StackPanel{Spacing=4,Children={new TextBlock{[!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Reason"),FontWeight=FontWeight.SemiBold},new TextBlock{Text=reason,TextWrapping=TextWrapping.Wrap}}});
+        body.Children.Add(new TextBlock{[!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Selected shifts"),FontSize=16,FontWeight=FontWeight.SemiBold});
         body.Children.Add(new TextBlock{Text="Weekends, public holidays and existing reservations are excluded. Times shown in "+TimeZoneInfo.Local.DisplayName+".",TextWrapping=TextWrapping.Wrap,FontSize=12});
         foreach(var shift in review.Shifts)
         {
             var content=new StackPanel{Spacing=6};content.Children.Add(new TextBlock{Text=shift.AnchorDate.ToString("dddd, d MMM yyyy"),FontWeight=FontWeight.SemiBold});
             content.Children.Add(new TextBlock{Text=shift.HoursLabel,TextWrapping=TextWrapping.Wrap});var card=Card(content);card.Classes.Add("vacation-shift-card");body.Children.Add(card);
         }
-        if(review.Shifts.Count==0)body.Children.Add(new TextBlock{Text="No working shifts fall within these dates.",TextWrapping=TextWrapping.Wrap});
+        if(review.Shifts.Count==0)body.Children.Add(new TextBlock{[!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("No working shifts fall within these dates."),TextWrapping=TextWrapping.Wrap});
         var motion=new WindowMotion(this);
-        var back=new Button{Content="Back",MinHeight=40};back.Classes.Add("quiet");back.Click+=async(_,_)=>await motion.CloseAsync(false);
-        var confirm=new Button{Name="ConfirmVacationRequest",Content="Confirm vacation request",MinHeight=40,IsEnabled=days>0};confirm.Classes.Add("fire-btn");confirm.Click+=async(_,_)=>await motion.CloseAsync(true);
+        var back=new Button{[!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Back"),MinHeight=40};back.Classes.Add("quiet");back.Click+=async(_,_)=>await motion.CloseAsync(false);
+        var confirm=new Button{Name="ConfirmVacationRequest",[!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Confirm vacation request"),MinHeight=40,IsEnabled=days>0};confirm.Classes.Add("fire-btn");confirm.Click+=async(_,_)=>await motion.CloseAsync(true);
         var actions=new WrapPanel{HorizontalAlignment=HorizontalAlignment.Right,Children={back,confirm}};
         var footer=new Border{Padding=new Thickness(20,12),BorderThickness=new Thickness(0,1,0,0),Child=actions};footer.Bind(Border.BorderBrushProperty,this.GetResourceObservable("ForgeBorder"));footer.Bind(Border.BackgroundProperty,this.GetResourceObservable("ForgeSurface"));
         var layout=new Grid{RowDefinitions=new RowDefinitions("Auto,*,Auto")};layout.Children.Add(heading);var scroll=new ScrollViewer{Content=body,HorizontalScrollBarVisibility=Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled};Grid.SetRow(scroll,1);layout.Children.Add(scroll);Grid.SetRow(footer,2);layout.Children.Add(footer);Content=layout;

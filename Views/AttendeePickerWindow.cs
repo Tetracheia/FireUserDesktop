@@ -32,7 +32,7 @@ internal sealed class AttendeePickerWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner; DataContext = model;
         this.Bind(BackgroundProperty, this.GetResourceObservable("ForgeBg")); this.Bind(ForegroundProperty, this.GetResourceObservable("ForgeTextPrimary"));
         var content = new StackPanel { Spacing = 14, Margin = new Thickness(24) };
-        content.Children.Add(new TextBlock { Text = "Meeting attendees", FontSize = 16.8, FontWeight = Avalonia.Media.FontWeight.Bold });
+        content.Children.Add(new TextBlock { [!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Meeting attendees"), FontSize = 16.8, FontWeight = Avalonia.Media.FontWeight.Bold });
         var search = new TextBox { PlaceholderText = "Search employees by name" }; search.Bind(TextBox.TextProperty, new Binding(nameof(model.Search)) { Mode = BindingMode.TwoWay }); content.Children.Add(search);
         var panes = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") };
         panes.Children.Add(Pane("Search results", model.Results, model.SelectAllCommand, "Select all results"));
@@ -41,15 +41,15 @@ internal sealed class AttendeePickerWindow : Window
         {
             var units = new ComboBox { ItemsSource = model.Units, PlaceholderText = "Select a business unit and its children", HorizontalAlignment = HorizontalAlignment.Stretch };
             units.Bind(ComboBox.SelectedItemProperty, new Binding(nameof(model.Unit)) { Mode = BindingMode.TwoWay }); content.Children.Add(units);
-            content.Children.Add(new Button { Content = "Add business unit and children", Command = model.AddUnitCommand });
-            content.Children.Add(new TextBlock { Text = "Only units within your reporting responsibility are available.", TextWrapping = Avalonia.Media.TextWrapping.Wrap });
+            content.Children.Add(new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Add business unit and children"), Command = model.AddUnitCommand });
+            content.Children.Add(new TextBlock { [!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Only units within your reporting responsibility are available."), TextWrapping = Avalonia.Media.TextWrapping.Wrap });
             content.Children.Add(new ItemsControl { ItemsSource = model.SelectedUnits, ItemTemplate = new FuncDataTemplate<UserIdentityDesktop.Core.Models.MeetingUnitOption>((unit, _) => new Button { Content = unit!.Name + " ×", Command = model.RemoveUnitCommand, CommandParameter = unit }) });
             var email = new TextBox { PlaceholderText = "Guest email address" }; email.Bind(TextBox.TextProperty, new Binding(nameof(model.Email)) { Mode = BindingMode.TwoWay }); content.Children.Add(email);
-            content.Children.Add(new Button { Content = "Add email invitation", Command = model.AddEmailCommand });
+            content.Children.Add(new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Add email invitation"), Command = model.AddEmailCommand });
             content.Children.Add(new ItemsControl { ItemsSource = model.Emails, ItemTemplate = new FuncDataTemplate<string>((value, _) => new Button { Content = value + " ×", Command = model.RemoveEmailCommand, CommandParameter = value }) });
         }
         var error = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap }; error.Bind(TextBlock.TextProperty, new Binding(nameof(model.Error))); content.Children.Add(error);
-        var done = new Button { Content = "Done", HorizontalAlignment = HorizontalAlignment.Right }; done.Classes.Add("fire-btn"); content.Children.Add(done);
+        var done = new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Done"), HorizontalAlignment = HorizontalAlignment.Right }; done.Classes.Add("fire-btn"); content.Children.Add(done);
         var surface = new Grid(); surface.Children.Add(new ScrollViewer { Content = content }); surface.Children.Add(transfers); Content = surface;
         Closed += (_, _) => { foreach (var stop in motions.ToArray()) stop.Cancel(); transfers.Children.Clear(); }; var motion = new WindowMotion(this); done.Click += async (_, _) => await motion.CloseAsync<object?>(null);
         Opened += async (_, _) =>

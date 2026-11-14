@@ -142,7 +142,7 @@ public sealed class AttachmentGalleryWindow : Window
                 var card = new StackPanel { Width = 180, Margin = new Thickness(8), Spacing = 6 }; card.Children.Add(open);
                 card.Children.Add(new TextBlock { Text = item.FileName, FontSize = 12, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, TextAlignment = TextAlignment.Center });
                 card.Children.Add(new TextBlock { Text = item.FormattedFileSize, FontSize = 11, Opacity = .7, TextAlignment = TextAlignment.Center });
-                if (item.IsDocument) card.Children.Add(new Button { Content = "Download", Command = item.DownloadCommand, HorizontalAlignment = HorizontalAlignment.Center, Classes = { "quiet" } });
+                if (item.IsDocument) card.Children.Add(new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Download"), Command = item.DownloadCommand, HorizontalAlignment = HorizontalAlignment.Center, Classes = { "quiet" } });
                 cards.Children.Add(card);
                 if (item.IsImage) _ = LoadGalleryThumbnail(item, photo, version, token);
             }
@@ -171,7 +171,7 @@ public sealed class AttachmentGalleryWindow : Window
         ApplyMode(false);
         var item = attachments[index]; Title = title.Text = item.FileName; position.Text = $"{index + 1} / {attachments.Count}";
         previous.IsEnabled = index > 0; next.IsEnabled = index + 1 < attachments.Count;
-        preview.Content = new TextBlock { Text = "Loading preview…", Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        preview.Content = new TextBlock { [!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Loading preview…"), Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         if (IsPresenting) ExitFullscreen();
         try
         {

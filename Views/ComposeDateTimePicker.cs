@@ -41,10 +41,10 @@ public sealed class ComposeDateTimePicker : UserControl
         var face=new Grid{ColumnDefinitions=new ColumnDefinitions("40,*,40")};face.Children.Add(icon);face.Children.Add(label);Grid.SetColumn(label,1);face.Children.Add(arrow);Grid.SetColumn(arrow,2);
         trigger=new Button{Content=face,Padding=new Thickness(0),MinHeight=46,CornerRadius=new CornerRadius(16),BorderThickness=new Thickness(1),HorizontalAlignment=HorizontalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Stretch};DesktopIconography.SetEnabled(trigger,false);trigger.Bind(BackgroundProperty,this.GetResourceObservable("ComposeInput"));trigger.Bind(BorderBrushProperty,this.GetResourceObservable("ForgeBorder"));AutomationProperties.SetName(trigger,"Choose date and time");
         calendar=new Calendar{IsTodayHighlighted=true};clock=new TimePicker{HorizontalAlignment=HorizontalAlignment.Stretch};
-        var done=new Button{Content="Done",HorizontalAlignment=HorizontalAlignment.Right,Classes={"fire-btn"}};
-        clear=new Button{Content="Clear",Classes={"quiet"},IsVisible=false};
+        var done=new Button{[!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Done"),HorizontalAlignment=HorizontalAlignment.Right,Classes={"fire-btn"}};
+        clear=new Button{[!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Clear"),Classes={"quiet"},IsVisible=false};
         var footer=new Grid{ColumnDefinitions=new ColumnDefinitions("*,Auto"),Children={clear,done}};Grid.SetColumn(done,1);
-        var content=new StackPanel{Spacing=12,Children={calendar,new TextBlock{Text="Time"},clock,footer}};
+        var content=new StackPanel{Spacing=12,Children={calendar,new TextBlock{[!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Time")},clock,footer}};
         var surface=new Border{Child=content,Padding=new Thickness(14),CornerRadius=new CornerRadius(16),BorderThickness=new Thickness(1)};surface.Bind(BackgroundProperty,this.GetResourceObservable("ForgeSurfaceCard"));surface.Bind(BorderBrushProperty,this.GetResourceObservable("ForgeBorder"));
         popup=new Popup{PlacementTarget=trigger,Placement=PlacementMode.Bottom,IsLightDismissEnabled=true,Child=surface};
         var root=new Panel{Children={trigger,popup}};Content=root;

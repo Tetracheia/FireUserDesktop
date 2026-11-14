@@ -118,7 +118,7 @@ public partial class ScheduleCalendar : UserControl
             Control content;
             if (items.Length == 0)
             {
-                var create = new Button { Content = "+ Create schedule", Classes = { "calendar-slot" }, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
+                var create = new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("+ Create schedule"), Classes = { "calendar-slot" }, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch };
                 create.Click += (_, _) => CreateScheduleRequested?.Invoke(selected, TimeSpan.FromHours(at));
                 content = create;
             }
@@ -128,7 +128,7 @@ public partial class ScheduleCalendar : UserControl
     }
 
     private void UpdateHours(){var hour=HourChoice.SelectedIndex;HourChoice.ItemsSource=Enumerable.Range(0,24).Select(x=>WorkClock.Time(DateTime.Today.AddHours(x))).ToArray();HourChoice.SelectedIndex=hour;}
-    private void ClockChanged(object? sender,System.ComponentModel.PropertyChangedEventArgs e){if(e.PropertyName==nameof(UserIdentityDesktop.ViewModels.ClockDisplaySettings.TwelveHour)){UpdateHours();RefreshDays();}}
+    private void ClockChanged(object? sender,System.ComponentModel.PropertyChangedEventArgs e){if(e.PropertyName is nameof(UserIdentityDesktop.ViewModels.ClockDisplaySettings.TwelveHour) or nameof(UserIdentityDesktop.ViewModels.ClockDisplaySettings.Identifier)){UpdateHours();RefreshDays();}}
     private void Create_Click(object? sender, RoutedEventArgs e) =>
         CreateScheduleRequested?.Invoke(FocusDate?.Date ?? DateTime.Today, new TimeSpan(Math.Max(0, HourChoice.SelectedIndex), Math.Max(0, MinuteChoice.SelectedIndex), 0));
 

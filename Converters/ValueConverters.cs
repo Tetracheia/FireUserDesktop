@@ -51,15 +51,15 @@ public class DateTimeFormatConverter : IValueConverter, IMultiValueConverter
             var local = dt.ToLocalTime();
             var now = DateTime.Now;
             if(parameter as string=="full")return UserIdentityDesktop.Core.Models.WorkClock.DateTime(local);
-            if(parameter as string=="message")return local.Date==now.Date ? UserIdentityDesktop.Core.Models.WorkClock.Time(local) : local.ToString("d MMM yyyy")+" · "+UserIdentityDesktop.Core.Models.WorkClock.Time(local);
+            if(parameter as string=="message")return local.Date==now.Date ? UserIdentityDesktop.Core.Models.WorkClock.Time(local) : local.ToString("d MMM yyyy",UserIdentityDesktop.Core.Locale.LocaleCatalog.DisplayCulture)+" · "+UserIdentityDesktop.Core.Models.WorkClock.Time(local);
 
             if (local.Date == now.Date)
                 return UserIdentityDesktop.Core.Models.WorkClock.Time(local);
             if (local.Date == now.Date.AddDays(-1))
-                return "Yesterday "+UserIdentityDesktop.Core.Models.WorkClock.Time(local);
+                return UserIdentityDesktop.Core.Locale.LocaleCatalog.Text("Yesterday")+" "+UserIdentityDesktop.Core.Models.WorkClock.Time(local);
             if (local.Year == now.Year)
-                return local.ToString("MMM d")+", "+UserIdentityDesktop.Core.Models.WorkClock.Time(local);
-            return local.ToString("MMM d, yyyy");
+                return local.ToString("MMM d",UserIdentityDesktop.Core.Locale.LocaleCatalog.DisplayCulture)+", "+UserIdentityDesktop.Core.Models.WorkClock.Time(local);
+            return local.ToString("MMM d, yyyy",UserIdentityDesktop.Core.Locale.LocaleCatalog.DisplayCulture);
         }
         return string.Empty;
     }

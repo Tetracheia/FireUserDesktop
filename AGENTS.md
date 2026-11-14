@@ -150,3 +150,8 @@ Preserve the Angular palette and Outfit font, the 70px navigation rail expanding
 The workspace rail includes Call Logs at tab index 6; preserve existing tab indices used by notifications and navigation. `WorkspaceViewModel.CallLogs` owns history paging, seen acknowledgements and redial. `Views/CallLogsView` only binds that state. `ICollaborationApi` uses `/api/Calls/Logs` and `Logs/Seen`; only send the snapshot's server `ObservedAt`. Opening history clears missed calls through that snapshot, synchronized via `CallLogsSeen`. Call-summary message events and reconnect refresh history; do not poll. Redial creates a new call with the original audio/video type through existing server permissions and native media lifecycle.
 
 The composer uses a single action slot: ShowRecordAction for empty/whitespace drafts, ShowSendAction for text, attachments or editing. Preserve the separate recording/prepared-audio lifecycle. SurfaceMotion's composer effects run only when the mode changes and honor reduced motion; do not retrigger them on every character.
+
+
+## Account language (2026-11-13)
+
+The owner requested English/Arabic/Greek interface/system messages and errors, with account-persisted language across clients. Reuse the existing appearance preference endpoint and owner-targeted event; accept en/ar/el only. Keep user-written chat, names, resource content and protocol values literal. Author catalogs in the Angular public/locales folder and regenerate independent backend/native copies with scripts/sync-locales.mjs. See docs/account-language.md and the backend contract. Preserve partial nullable updates and stale/account-switch guards; no preference polling.

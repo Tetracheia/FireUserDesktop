@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl FlowDirection="{ReflectionBinding Direction, Source={x:Static loc:LocalizedStrings.Shared}}" xmlns="https://github.com/avaloniaui" xmlns:loc="using:UserIdentityDesktop.Localization" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="UserIdentityDesktop.Views.ScheduleCalendar">
   <UserControl.Styles>
     <Style Selector="Button.calendar-day">
@@ -22,21 +22,21 @@
   <StackPanel Spacing="12">
 
     <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-      <Button Content="‹" Click="Previous_Click" AutomationProperties.Name="Previous month" />
+      <Button Content="‹" Click="Previous_Click" AutomationProperties.Name="{loc:Translate loc_6a2769502a5d}" />
       <TextBlock x:Name="MonthTitle" Grid.Column="1" VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Margin="12,0" />
-      <Button Grid.Column="2" Content="›" Click="Next_Click" AutomationProperties.Name="Next month" />
-      <Button Grid.Column="3" Content="Today" Click="Today_Click" Margin="8,0,0,0" />
+      <Button Grid.Column="2" Content="›" Click="Next_Click" AutomationProperties.Name="{loc:Translate loc_74e53211fef4}" />
+      <Button Grid.Column="3" Content="{loc:Translate loc_2b065c7c9ce4}" Click="Today_Click" Margin="8,0,0,0" />
     </Grid>
-    <WrapPanel ItemSpacing="14" LineSpacing="7"><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#6D89DC"/><TextBlock Text="Events" Classes="caption"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#AF7DE4"/><TextBlock Text="Meetings" Classes="caption"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#DB952C"/><TextBlock Text="Tasks" Classes="caption"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#359B84"/><TextBlock Text="Vacation" Classes="caption"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#D66985"/><TextBlock Text="Holidays" Classes="caption"/></StackPanel></WrapPanel>
+    <WrapPanel ItemSpacing="14" LineSpacing="7"><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#6D89DC"/><TextBlock Text="{loc:Translate loc_8d14f6e72de8}" Classes="caption"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#AF7DE4"/><TextBlock Text="{loc:Translate loc_bca705b63a3c}" Classes="caption"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#DB952C"/><TextBlock Text="{loc:Translate loc_b3a60e61a523}" Classes="caption"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#359B84"/><TextBlock Text="{loc:Translate loc_92930e0fb3a8}" Classes="caption"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><Ellipse Width="7" Height="7" Fill="#D66985"/><TextBlock Text="{loc:Translate loc_5939d51663b5}" Classes="caption"/></StackPanel></WrapPanel>
     <Border BorderBrush="{DynamicResource ForgeBorder}" BorderThickness="1,1,0,0" CornerRadius="12" ClipToBounds="True">
       <Grid x:Name="DayGrid" ColumnDefinitions="*,*,*,*,*,*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" />
     </Border>
     <TextBlock x:Name="SelectedDayTitle" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
     <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-      <TextBlock Text="Choose a time to create a schedule." VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}" />
-      <ComboBox x:Name="HourChoice" Grid.Column="1" SelectedIndex="9" MinWidth="65" AutomationProperties.Name="Schedule hour" />
-      <ComboBox x:Name="MinuteChoice" Grid.Column="2" SelectedIndex="0" MinWidth="65" Margin="6,0" AutomationProperties.Name="Schedule minute" />
-      <Button Grid.Column="3" Content="Create schedule" Click="Create_Click" />
+      <TextBlock Text="{loc:Translate loc_a28a51846cc4}" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}" />
+      <ComboBox x:Name="HourChoice" Grid.Column="1" SelectedIndex="9" MinWidth="65" AutomationProperties.Name="{loc:Translate loc_8269f86cb173}" />
+      <ComboBox x:Name="MinuteChoice" Grid.Column="2" SelectedIndex="0" MinWidth="65" Margin="6,0" AutomationProperties.Name="{loc:Translate loc_8eb6f6a1af67}" />
+      <Button Grid.Column="3" Content="{loc:Translate loc_5b08f3c71912}" Click="Create_Click" />
     </Grid>
     <ScrollViewer MaxHeight="460"><StackPanel x:Name="HourlyAgenda" Spacing="0" /></ScrollViewer>
   </StackPanel>

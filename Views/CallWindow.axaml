@@ -1,5 +1,5 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<Window FlowDirection="{ReflectionBinding Direction, Source={x:Static loc:LocalizedStrings.Shared}}" xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:UserIdentityDesktop.Localization" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:UserIdentityDesktop.ViewModels"
         xmlns:model="using:UserIdentityDesktop.Core.Models"
         xmlns:views="using:UserIdentityDesktop.Views"
@@ -46,34 +46,34 @@
         <Border Width="4" CornerRadius="2" Background="{DynamicResource ForgePrimaryGradient}" />
         <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding CallTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding ParticipantSummary}" Foreground="{DynamicResource ForgeTextSecondary}" FontSize="12"/></StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <ComboBox x:Name="FullscreenSourcePicker" ItemsSource="{Binding Videos}" SelectedItem="{Binding FocusedVideo, Mode=TwoWay}" MaxWidth="240" MinWidth="160" AutomationProperties.Name="Choose camera or shared screen" PlaceholderText="Choose a source">
+          <ComboBox x:Name="FullscreenSourcePicker" ItemsSource="{Binding Videos}" SelectedItem="{Binding FocusedVideo, Mode=TwoWay}" MaxWidth="240" MinWidth="160" AutomationProperties.Name="{loc:Translate loc_fed2378c7264}" PlaceholderText="Choose a source">
             <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:VideoTileViewModel"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate>
           </ComboBox>
-          <Button Content="Gallery" Classes="call-control" Command="{Binding ClearVideoFocusCommand}" AutomationProperties.Name="Show all participants"/>
+          <Button Content="{loc:Translate loc_352cfc749e55}" Classes="call-control" Command="{Binding ClearVideoFocusCommand}" AutomationProperties.Name="{loc:Translate loc_b3891695716e}"/>
         </StackPanel>
       </Grid>
     </Border>
     <Border x:Name="CallHeader" Background="{DynamicResource ForgeSurface}" BorderBrush="{DynamicResource ForgeBorder}" BorderThickness="0,0,0,1" Padding="24,14">
       <Grid ColumnDefinitions="Auto,*,Auto">
         <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource ForgePrimaryGradient}" VerticalAlignment="Center"><PathIcon Data="{StaticResource Glyph.Phone}" Width="18" Height="18" Foreground="White" /></Border>
-        <StackPanel Grid.Column="1" Spacing="5" Margin="12,0" VerticalAlignment="Center"><TextBlock Text="{Binding CallTitle}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding ConnectionBannerText}" IsVisible="{Binding ShowConnectionBanner}" Classes="caption" TextWrapping="Wrap"/><TextBlock Text="Connecting to call…" IsVisible="{Binding ConnectingCall}" Foreground="{DynamicResource ForgePrimary}" /><TextBlock Text="{Binding ParticipantSummary}" Foreground="{DynamicResource ForgeTextMuted}" FontSize="12" /></StackPanel>
+        <StackPanel Grid.Column="1" Spacing="5" Margin="12,0" VerticalAlignment="Center"><TextBlock Text="{Binding CallTitle}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding ConnectionBannerText}" IsVisible="{Binding ShowConnectionBanner}" Classes="caption" TextWrapping="Wrap"/><TextBlock Text="{loc:Translate loc_48b0e4e512d8}" IsVisible="{Binding ConnectingCall}" Foreground="{DynamicResource ForgePrimary}" /><TextBlock Text="{Binding ParticipantSummary}" Foreground="{DynamicResource ForgeTextMuted}" FontSize="12" /></StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Classes="quiet" Content="Chat" Command="{Binding ToggleCallChatCommand}" />
-          <Button Classes="quiet" Content="Members" Command="{Binding ToggleCallMembersCommand}" />
-          <Button x:Name="FullscreenButton" Classes="quiet" Content="Full screen" Click="Fullscreen_Click" AutomationProperties.Name="Full screen call" ToolTip.Tip="Full screen (F11); Escape to return when viewing. Ctrl+Alt+Escape releases remote control." />
-          <Button Classes="quiet" Content="Gallery" Command="{Binding ClearVideoFocusCommand}" IsVisible="{Binding HasFocusedVideo}" />
-          <Button x:Name="CallDevicesButton" Content="Devices" Classes="quiet" Margin="0" Click="Devices_Click" AutomationProperties.Name="Call devices">
+          <Button Classes="quiet" Content="{loc:Translate loc_460b3a7da007}" Command="{Binding ToggleCallChatCommand}" />
+          <Button Classes="quiet" Content="{loc:Translate loc_1044a4c056d0}" Command="{Binding ToggleCallMembersCommand}" />
+          <Button x:Name="FullscreenButton" Classes="quiet" Content="{loc:Translate loc_674fe2acd0d5}" Click="Fullscreen_Click" AutomationProperties.Name="{loc:Translate loc_7bfa1292b437}" ToolTip.Tip="{loc:Translate loc_0aa5f1a56d9a}" />
+          <Button Classes="quiet" Content="{loc:Translate loc_352cfc749e55}" Command="{Binding ClearVideoFocusCommand}" IsVisible="{Binding HasFocusedVideo}" />
+          <Button x:Name="CallDevicesButton" Content="{loc:Translate loc_4ba5121d4d1b}" Classes="quiet" Margin="0" Click="Devices_Click" AutomationProperties.Name="{loc:Translate loc_d0a7cc115a6a}">
             <Button.Flyout><Flyout><StackPanel Width="320" Spacing="10">
-              <TextBlock Text="Call devices" FontSize="18" FontWeight="SemiBold" />
-              <Button Content="Refresh devices" Command="{Binding RefreshDevicesCommand}" IsEnabled="{Binding !CheckingDevices}" />
-              <TextBlock Text="Microphone" />
+              <TextBlock Text="{loc:Translate loc_d0a7cc115a6a}" FontSize="18" FontWeight="SemiBold" />
+              <Button Content="{loc:Translate loc_67f9239ead4a}" Command="{Binding RefreshDevicesCommand}" IsEnabled="{Binding !CheckingDevices}" />
+              <TextBlock Text="{loc:Translate loc_186352a881d0}" />
               <ComboBox ItemsSource="{Binding Microphones}" SelectedItem="{Binding SelectedMicrophone}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="model:MediaDeviceOption"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
-              <TextBlock Text="Speaker / headphones" />
+              <TextBlock Text="{loc:Translate loc_a6c9a4c6f295}" />
               <ComboBox ItemsSource="{Binding Speakers}" SelectedItem="{Binding SelectedSpeaker}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="model:MediaDeviceOption"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
-              <TextBlock Text="Camera" />
+              <TextBlock Text="{loc:Translate loc_03494b0d1f80}" />
               <ComboBox ItemsSource="{Binding Cameras}" SelectedItem="{Binding SelectedCamera}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="model:MediaDeviceOption"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
               <TextBlock Text="{Binding DeviceStatus}" TextWrapping="Wrap" FontSize="12" />
-              <TextBlock Text="Microphone and camera changes apply when you next enable them. Speaker changes apply immediately." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource ForgeTextSecondary}" />
+              <TextBlock Text="{loc:Translate loc_285c643ad82e}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource ForgeTextSecondary}" />
             </StackPanel></Flyout></Button.Flyout>
           </Button></StackPanel>
       </Grid>
@@ -90,7 +90,7 @@
                     <Border Width="86" Height="86" CornerRadius="43" ClipToBounds="True" BorderBrush="#CCFFFFFF" BorderThickness="2" Background="{DynamicResource ForgePrimaryGradient}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasFrame}"><Panel><TextBlock Text="{Binding Initials}" FontSize="29" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" /><Image Source="{Binding Avatar}" IsVisible="{Binding HasAvatar}" Stretch="UniformToFill" /></Panel></Border>
                     <Grid ColumnDefinitions="*,Auto" Margin="16,14" VerticalAlignment="Top"><TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><Border Grid.Column="1" Background="{DynamicResource ForgeSurface}" CornerRadius="6" Padding="7,4"><TextBlock Text="{Binding Quality}" Classes="caption" /></Border></Grid>
                     <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="14" Background="{DynamicResource ForgeSurface}" CornerRadius="7" Padding="9,6"><TextBlock Text="{Binding MicrophoneLabel}" FontSize="11" Foreground="{DynamicResource ForgeTextSecondary}" /></Border>
-                    <Button Classes="quiet square" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="10" Click="TileMenu_Click" AutomationProperties.Name="Participant actions"><PathIcon Data="{StaticResource Glyph.More}" Width="16" Height="16" /></Button>
+                    <Button Classes="quiet square" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="10" Click="TileMenu_Click" AutomationProperties.Name="{loc:Translate loc_2b602aafe06c}"><PathIcon Data="{StaticResource Glyph.More}" Width="16" Height="16" /></Button>
                   </Grid>
                 </Border>
               </DataTemplate></ItemsControl.ItemTemplate>
@@ -99,27 +99,27 @@
           <ContentControl x:Name="FocusedStage" Content="{Binding FocusedVideo}" PointerPressed="FocusedTile_Pressed" ContextRequested="FocusedTile_ContextRequested" IsVisible="{Binding FocusedVideo, Converter={StaticResource NullToBoolConverter}}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
             <ContentControl.ContentTemplate><DataTemplate x:DataType="vm:VideoTileViewModel">
               <Border x:Name="CallBodyBackground" Classes.speaking="{Binding IsSpeaking}" Classes.waiting-control="{Binding WaitingForControl}" Background="{DynamicResource ForgeBgSecondary}" CornerRadius="14"><Grid RowDefinitions="*,Auto"><Border Width="112" Height="112" CornerRadius="56" ClipToBounds="True" Background="{DynamicResource ForgePrimaryGradient}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasFrame}"><Panel><TextBlock Text="{Binding Initials}" FontSize="36" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" /><Image Source="{Binding Avatar}" IsVisible="{Binding HasAvatar}" Stretch="UniformToFill" /></Panel></Border><views:NativeVideoView Frame="{Binding Frame}" RemoteControlEnabled="{Binding CanControl}" RemoteInputActive="{Binding InputActive}" InputCommand="{Binding InputCommand}" />
-                <Border IsVisible="{Binding WaitingForControl}" IsHitTestVisible="False" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="16" Padding="14,10" CornerRadius="10" Background="{DynamicResource ForgeSurface}" BorderBrush="{DynamicResource ForgePrimary}" BorderThickness="1"><TextBlock Text="Approved · click the shared screen to take control" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextPrimary}" /></Border>
+                <Border IsVisible="{Binding WaitingForControl}" IsHitTestVisible="False" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="16" Padding="14,10" CornerRadius="10" Background="{DynamicResource ForgeSurface}" BorderBrush="{DynamicResource ForgePrimary}" BorderThickness="1"><TextBlock Text="{loc:Translate loc_dc23c0d92928}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextPrimary}" /></Border>
                 <TextBlock Grid.Row="1" Text="{Binding Name}" Margin="12" FontSize="12" Foreground="{DynamicResource ForgeTextSecondary}" /></Grid></Border>
             </DataTemplate></ContentControl.ContentTemplate>
           </ContentControl>
         </Grid>
         <Border Grid.Column="1" Width="248" Margin="18,0,0,0" Padding="18" Background="{DynamicResource ForgeSurfaceCard}" CornerRadius="12" IsVisible="{Binding ShowCallMembers}">
-          <StackPanel Spacing="16"><TextBlock Text="In this call" FontSize="17" FontWeight="SemiBold" /><ScrollViewer MaxHeight="320"><ItemsControl ItemsSource="{Binding Videos}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:VideoTileViewModel"><Border Padding="10,12" BorderBrush="{DynamicResource ForgeBorder}" BorderThickness="0,0,0,1" IsVisible="{Binding !IsScreen}"><StackPanel Spacing="5"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" /><TextBlock Text="{Binding MicrophoneLabel}" Classes="caption" /></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
-        <StackPanel IsVisible="{Binding IsMeetingCall}" Spacing="8"><TextBox Text="{Binding CallInviteEmail}" PlaceholderText="name@example.com" views:EnterSubmit.Command="{Binding InviteCallEmailCommand}" AutomationProperties.Name="Attendee email address"/><Button Content="Invite" Classes="fire-btn" Command="{Binding InviteCallEmailCommand}"/><TextBlock Text="{Binding Feedback}" TextWrapping="Wrap" Classes="caption"/></StackPanel>
-        <Button Content="Choose attendees" Click="ChooseCallAttendees_Click" IsVisible="{Binding CanInviteToCall}" />
-          <Button Content="Invite to call" Command="{Binding InviteCallCommand}" IsVisible="{Binding CanInviteToCall}" /></StackPanel></Border>
+          <StackPanel Spacing="16"><TextBlock Text="{loc:Translate loc_5b08e804f57b}" FontSize="17" FontWeight="SemiBold" /><ScrollViewer MaxHeight="320"><ItemsControl ItemsSource="{Binding Videos}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:VideoTileViewModel"><Border Padding="10,12" BorderBrush="{DynamicResource ForgeBorder}" BorderThickness="0,0,0,1" IsVisible="{Binding !IsScreen}"><StackPanel Spacing="5"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" /><TextBlock Text="{Binding MicrophoneLabel}" Classes="caption" /></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+        <StackPanel IsVisible="{Binding IsMeetingCall}" Spacing="8"><TextBox Text="{Binding CallInviteEmail}" PlaceholderText="name@example.com" views:EnterSubmit.Command="{Binding InviteCallEmailCommand}" AutomationProperties.Name="{loc:Translate loc_25d3f3a0e13e}"/><Button Content="{loc:Translate loc_1fd9ae1607aa}" Classes="fire-btn" Command="{Binding InviteCallEmailCommand}"/><TextBlock Text="{loc:TranslateBinding Feedback}" TextWrapping="Wrap" Classes="caption"/></StackPanel>
+        <Button Content="{loc:Translate loc_336fe55b503c}" Click="ChooseCallAttendees_Click" IsVisible="{Binding CanInviteToCall}" />
+          <Button Content="{loc:Translate loc_8292a3db192c}" Command="{Binding InviteCallCommand}" IsVisible="{Binding CanInviteToCall}" /></StackPanel></Border>
         <Border x:Name="CallChatPanel" Grid.Column="2" Width="360" IsVisible="{Binding ShowCallChat}" Margin="18,0,0,0" Padding="12" CornerRadius="12" Background="{DynamicResource ForgeSurfaceCard}">
           <Grid RowDefinitions="Auto,*,Auto">
 <TextBlock Text="{Binding Chat.SelectedRecipientName, StringFormat='Chat: {0}'}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
             <ListBox x:Name="CallMessageStream" Classes="call-message-stream" Grid.Row="1" ItemsSource="{Binding Chat.Messages}" Margin="0,10" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate x:DataType="vm:ChatMessageItemViewModel"><views:ChatMessageCard Chat="{Binding #RootCallWindow.((vm:WorkspaceViewModel)DataContext).Chat}"/></DataTemplate></ListBox.ItemTemplate></ListBox>
             <StackPanel Grid.Row="2" Spacing="8" views:EnterSubmit.Command="{Binding Chat.SendMessageCommand}">
-              <Border IsVisible="{Binding Chat.HasMessageAction}" BorderBrush="{DynamicResource ForgePrimary}" BorderThickness="2,0,0,0" Padding="8"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding Chat.MessageActionLabel}" TextWrapping="Wrap"/><Button Grid.Column="1" Classes="quiet square" Content="×" Command="{Binding Chat.CancelMessageActionCommand}" AutomationProperties.Name="Cancel reply or edit"/></Grid></Border>
-              <ItemsControl ItemsSource="{Binding Chat.PendingAttachments}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PendingAttachmentViewModel"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis"/><Button Grid.Column="1" Classes="quiet square" Content="×" Command="{Binding #RootCallWindow.((vm:WorkspaceViewModel)DataContext).Chat.RemovePendingAttachmentCommand}" CommandParameter="{Binding}" AutomationProperties.Name="Remove attachment"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+              <Border IsVisible="{Binding Chat.HasMessageAction}" BorderBrush="{DynamicResource ForgePrimary}" BorderThickness="2,0,0,0" Padding="8"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding Chat.MessageActionLabel}" TextWrapping="Wrap"/><Button Grid.Column="1" Classes="quiet square" Content="×" Command="{Binding Chat.CancelMessageActionCommand}" AutomationProperties.Name="{loc:Translate loc_583bcc0ecd42}"/></Grid></Border>
+              <ItemsControl ItemsSource="{Binding Chat.PendingAttachments}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PendingAttachmentViewModel"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis"/><Button Grid.Column="1" Classes="quiet square" Content="×" Command="{Binding #RootCallWindow.((vm:WorkspaceViewModel)DataContext).Chat.RemovePendingAttachmentCommand}" CommandParameter="{Binding}" AutomationProperties.Name="{loc:Translate loc_595b066a8838}"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
               <Border Background="{DynamicResource ForgeSurface}" BorderBrush="{DynamicResource ForgeBorder}" BorderThickness="1" CornerRadius="14" Padding="6"><Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4" IsEnabled="{Binding Chat.CanTypeMessage}">
-                <Button Classes="quiet square" Command="{Binding Chat.AttachFilesCommand}" VerticalAlignment="Bottom" AutomationProperties.Name="Attach files"><PathIcon Data="{StaticResource Glyph.Attach}" Width="17" Height="20"/></Button>
-                <TextBox Grid.Column="1" Text="{Binding Chat.MessageDraft}" BorderThickness="0" Background="Transparent" PlaceholderText="Write a message…" AutomationProperties.Name="Message" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="38" MaxHeight="90"/>
-                <Button Grid.Column="2" Classes="fire-btn square" Command="{Binding Chat.SendMessageCommand}" IsEnabled="{Binding !Chat.IsSendingMessage}" VerticalAlignment="Bottom" AutomationProperties.Name="Send message"><PathIcon Data="{StaticResource Glyph.Send}" Width="18" Height="18"/></Button>
+                <Button Classes="quiet square" Command="{Binding Chat.AttachFilesCommand}" VerticalAlignment="Bottom" AutomationProperties.Name="{loc:Translate loc_e697cc1e45af}"><PathIcon Data="{StaticResource Glyph.Attach}" Width="17" Height="20"/></Button>
+                <TextBox Grid.Column="1" Text="{Binding Chat.MessageDraft}" BorderThickness="0" Background="Transparent" PlaceholderText="Write a message…" AutomationProperties.Name="{loc:Translate loc_2f77668a9dfb}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="38" MaxHeight="90"/>
+                <Button Grid.Column="2" Classes="fire-btn square" Command="{Binding Chat.SendMessageCommand}" IsEnabled="{Binding !Chat.IsSendingMessage}" VerticalAlignment="Bottom" AutomationProperties.Name="{loc:Translate loc_93a26b1eaff9}"><PathIcon Data="{StaticResource Glyph.Send}" Width="18" Height="18"/></Button>
               </Grid></Border>
               <TextBlock Text="{Binding Chat.SendError}" Foreground="{DynamicResource ForgeErrorText}" TextWrapping="Wrap" IsVisible="{Binding Chat.SendError, Converter={StaticResource NullToBoolConverter}}"/>
             </StackPanel>
@@ -127,7 +127,7 @@
         </Border>
       </Grid>
       <StackPanel x:Name="CallSupplement" Grid.Row="1" MaxHeight="180">
-        <Expander Header="Remote desktop" IsExpanded="False" IsVisible="{Binding RemoteDesktopAvailable}">
+        <Expander Header="{loc:Translate loc_ddd0c93c2d1b}" IsExpanded="False" IsVisible="{Binding RemoteDesktopAvailable}">
           <StackPanel Spacing="8">
             <TextBlock Text="{Binding RemoteControlLabel}" TextWrapping="Wrap" />
             <TextBlock Text="{Binding RemoteInputLatency}" TextWrapping="Wrap" IsVisible="{Binding HasRemoteControl}" />
@@ -135,20 +135,20 @@
               <ComboBox ItemsSource="{Binding RemotePeers}" SelectedItem="{Binding SelectedRemotePeer}" MinWidth="220" MaxWidth="380" PlaceholderText="Shared screen">
                 <ComboBox.ItemTemplate><DataTemplate x:DataType="model:NativePeer"><TextBlock Text="{Binding ScreenLabel}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate>
               </ComboBox>
-              <Button Content="Request control" Command="{Binding RequestControlCommand}" IsEnabled="{Binding CanRequestControl}" Margin="8,0" />
-              <Button Classes="remote-release" Content="Stop control / revoke access" Command="{Binding StopControlCommand}" IsEnabled="{Binding HasRemoteControl}" />
+              <Button Content="{loc:Translate loc_18beac93b632}" Command="{Binding RequestControlCommand}" IsEnabled="{Binding CanRequestControl}" Margin="8,0" />
+              <Button Classes="remote-release" Content="{loc:Translate loc_0dcf9b752a23}" Command="{Binding StopControlCommand}" IsEnabled="{Binding HasRemoteControl}" />
             </WrapPanel>
             <Border Background="{DynamicResource ForgeBgSecondary}" BorderBrush="{DynamicResource ForgePrimary}" BorderThickness="1" Padding="12" CornerRadius="8" IsVisible="{Binding ControlRequester, Converter={StaticResource NullToBoolConverter}}">
               <StackPanel Spacing="8">
-                <TextBlock Text="A participant requests keyboard and mouse control of your shared desktop:" TextWrapping="Wrap" FontWeight="Bold" />
+                <TextBlock Text="{loc:Translate loc_8efa3da79558}" TextWrapping="Wrap" FontWeight="Bold" />
                 <TextBlock Text="{Binding ControlRequesterName}" />
-                <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Allow for 5 minutes" Command="{Binding AllowControlCommand}" />
-                  <Button Content="Deny" Command="{Binding DenyControlCommand}" /></StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="{loc:Translate loc_078a965e8b06}" Command="{Binding AllowControlCommand}" />
+                  <Button Content="{loc:Translate loc_05a2d7332eb9}" Command="{Binding DenyControlCommand}" /></StackPanel>
               </StackPanel>
             </Border>
           </StackPanel>
         </Expander>
-        <TextBlock Text="{Binding Feedback}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}" Margin="0,12" />
+        <TextBlock Text="{loc:TranslateBinding Feedback}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}" Margin="0,12" />
 </StackPanel></Grid>
     <Border x:Name="FullscreenControls" Grid.Row="2" HorizontalAlignment="Stretch" Padding="12,10" MinHeight="76" Background="{DynamicResource ForgeSurface}" BorderBrush="{DynamicResource ForgeBorder}" BorderThickness="0,1,0,0">
       <ScrollViewer x:Name="FullscreenToolbarScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
@@ -156,45 +156,45 @@
         <StackPanel Spacing="8">
           <TextBlock Text="{Binding ConnectionBannerText}" IsVisible="{Binding ShowConnectionBanner}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}" />
           <WrapPanel HorizontalAlignment="Center">
-            <Button x:Name="ExitFullscreenButton" Classes="call-control" Content="Exit full screen" ToolTip.Tip="Escape when viewing; Ctrl+Alt+Escape to stop remote control" Click="Fullscreen_Click" AutomationProperties.Name="Exit full screen call" />
-            <Button Classes="call-control" Classes.active="{Binding MicrophoneEnabled}" Content="{Binding MicrophoneActionLabel}" Command="{Binding ToggleMicrophoneCommand}" AutomationProperties.Name="Toggle microphone" />
-            <Button Classes="call-control" Classes.active="{Binding CameraEnabled}" Content="{Binding CameraActionLabel}" Command="{Binding ToggleCameraCommand}" AutomationProperties.Name="Toggle camera" />
-            <Button Classes="call-control" Classes.active="{Binding ScreenEnabled}" Content="{Binding ScreenActionLabel}" Command="{Binding ToggleScreenCommand}" AutomationProperties.Name="Toggle screen sharing" />
-            <Button Classes="call-control" Content="Devices" Click="FullscreenDevices_Click" AutomationProperties.Name="Call devices" />
-            <Button Classes="call-control" Classes.active="{Binding ShowCallChat}" Content="Chat" Click="FullscreenChat_Click" />
-            <Button Classes="call-control" Classes.active="{Binding ShowCallMembers}" Content="Members" Click="FullscreenMembers_Click" />
-            <Button x:Name="ControlSessionsButton" Classes="call-control" Content="Control sessions" IsVisible="{Binding HasRemoteControl}" AutomationProperties.Name="Manage remote control sessions">
+            <Button x:Name="ExitFullscreenButton" Classes="call-control" Content="{loc:Translate loc_897e0cf78b80}" ToolTip.Tip="{loc:Translate loc_618605e9609a}" Click="Fullscreen_Click" AutomationProperties.Name="{loc:Translate loc_a7fbd109b29d}" />
+            <Button Classes="call-control" Classes.active="{Binding MicrophoneEnabled}" Content="{Binding MicrophoneActionLabel}" Command="{Binding ToggleMicrophoneCommand}" AutomationProperties.Name="{loc:Translate loc_542e869334d0}" />
+            <Button Classes="call-control" Classes.active="{Binding CameraEnabled}" Content="{Binding CameraActionLabel}" Command="{Binding ToggleCameraCommand}" AutomationProperties.Name="{loc:Translate loc_b50eae6645b0}" />
+            <Button Classes="call-control" Classes.active="{Binding ScreenEnabled}" Content="{Binding ScreenActionLabel}" Command="{Binding ToggleScreenCommand}" AutomationProperties.Name="{loc:Translate loc_2785debbca29}" />
+            <Button Classes="call-control" Content="{loc:Translate loc_4ba5121d4d1b}" Click="FullscreenDevices_Click" AutomationProperties.Name="{loc:Translate loc_d0a7cc115a6a}" />
+            <Button Classes="call-control" Classes.active="{Binding ShowCallChat}" Content="{loc:Translate loc_460b3a7da007}" Click="FullscreenChat_Click" />
+            <Button Classes="call-control" Classes.active="{Binding ShowCallMembers}" Content="{loc:Translate loc_1044a4c056d0}" Click="FullscreenMembers_Click" />
+            <Button x:Name="ControlSessionsButton" Classes="call-control" Content="{loc:Translate loc_e7c78a2614de}" IsVisible="{Binding HasRemoteControl}" AutomationProperties.Name="{loc:Translate loc_e8d8530f869c}">
               <Button.Flyout><Flyout><ScrollViewer MaxHeight="300"><StackPanel Width="300" Spacing="12">
-                <TextBlock Text="Remote control sessions" FontSize="17" FontWeight="SemiBold"/>
-                <TextBlock Text="Each device has one input owner. Click an approved shared screen to take control." TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}"/>
+                <TextBlock Text="{loc:Translate loc_ffe3c31ba327}" FontSize="17" FontWeight="SemiBold"/>
+                <TextBlock Text="{loc:Translate loc_7a0e424e1315}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}"/>
                 <ItemsControl ItemsSource="{Binding ControlSessions}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:RemoteControlSessionItem">
                   <Border Padding="0,10" BorderBrush="{DynamicResource ForgeBorder}" BorderThickness="0,1,0,0"><StackPanel Spacing="6">
                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding State}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}"/>
-                    <Button Content="End participant session" Classes="danger" Command="{Binding #ControlSessionsButton.((vm:WorkspaceViewModel)DataContext).EndControlSessionCommand}" CommandParameter="{Binding}"/>
+                    <Button Content="{loc:Translate loc_022549819f99}" Classes="danger" Command="{Binding #ControlSessionsButton.((vm:WorkspaceViewModel)DataContext).EndControlSessionCommand}" CommandParameter="{Binding}"/>
                   </StackPanel></Border>
                 </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
               </StackPanel></ScrollViewer></Flyout></Button.Flyout>
             </Button>
-            <Button Classes="call-control danger" Content="Leave call" Command="{Binding LeaveCommand}" />
+            <Button Classes="call-control danger" Content="{loc:Translate loc_06eb7d6c9ca6}" Command="{Binding LeaveCommand}" />
           </WrapPanel>
           <WrapPanel HorizontalAlignment="Center">
-            <Button x:Name="FullscreenRequestControl" Classes="call-control" Content="Request control of this share" Click="RequestFocusedControl_Click" IsVisible="{Binding CanRequestFocusedControl}" IsEnabled="{Binding CanRequestFocusedControl}" />
-            <Button Classes="call-control remote-release" Content="Stop control / revoke access" Command="{Binding StopControlCommand}" IsVisible="{Binding HasRemoteControl}" />
+            <Button x:Name="FullscreenRequestControl" Classes="call-control" Content="{loc:Translate loc_a5075acb4b8a}" Click="RequestFocusedControl_Click" IsVisible="{Binding CanRequestFocusedControl}" IsEnabled="{Binding CanRequestFocusedControl}" />
+            <Button Classes="call-control remote-release" Content="{loc:Translate loc_0dcf9b752a23}" Command="{Binding StopControlCommand}" IsVisible="{Binding HasRemoteControl}" />
           </WrapPanel>
-          <TextBlock Text="{Binding Feedback}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}" />
+          <TextBlock Text="{loc:TranslateBinding Feedback}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextSecondary}" />
           <TextBlock Text="{Binding RemoteControlLabel}" IsVisible="{Binding HasRemoteControl}" TextWrapping="Wrap" Foreground="{DynamicResource ForgeTextPrimary}" />
           <TextBlock Text="{Binding RemoteInputLatency}" IsVisible="{Binding HasRemoteControl}" TextWrapping="Wrap" />
-          <StackPanel IsVisible="{Binding ControlRequester, Converter={StaticResource NullToBoolConverter}}" Spacing="8"><TextBlock Text="{Binding ControlRequesterName, StringFormat='{}{0} requests control of your shared desktop'}" TextWrapping="Wrap" /><WrapPanel><Button Content="Allow for 5 minutes" Command="{Binding AllowControlCommand}" /><Button Content="Deny" Command="{Binding DenyControlCommand}" /></WrapPanel></StackPanel>
+          <StackPanel IsVisible="{Binding ControlRequester, Converter={StaticResource NullToBoolConverter}}" Spacing="8"><TextBlock Text="{Binding ControlRequesterName, StringFormat='{}{0} requests control of your shared desktop'}" TextWrapping="Wrap" /><WrapPanel><Button Content="{loc:Translate loc_078a965e8b06}" Command="{Binding AllowControlCommand}" /><Button Content="{loc:Translate loc_05a2d7332eb9}" Command="{Binding DenyControlCommand}" /></WrapPanel></StackPanel>
         </StackPanel>
       </Border>
       </ScrollViewer>
     </Border>
     <Border x:Name="CallFooter" Grid.Row="3" Background="{DynamicResource ForgeSurface}" BorderBrush="{DynamicResource ForgeBorder}" BorderThickness="0,1,0,0" Padding="20,14">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-        <Button Classes="media-control" Classes.off="{Binding !MicrophoneEnabled}" Command="{Binding ToggleMicrophoneCommand}" AutomationProperties.Name="Toggle microphone"><StackPanel Spacing="5" HorizontalAlignment="Center"><PathIcon Width="18" Height="20" Data="M9,2 L15,2 15,14 9,14 Z M5,10 L7,10 7,15 17,15 17,10 19,10 19,17 13,17 13,21 17,21 17,23 7,23 7,21 11,21 11,17 5,17 Z" /><TextBlock Text="{Binding MicrophoneActionLabel}" FontSize="11" HorizontalAlignment="Center" /></StackPanel></Button>
-        <Button Classes="media-control" Classes.off="{Binding !CameraEnabled}" Command="{Binding ToggleCameraCommand}" AutomationProperties.Name="Toggle camera"><StackPanel Spacing="5" HorizontalAlignment="Center"><PathIcon Width="21" Height="20" Data="M2,5 L16,5 16,19 2,19 Z M18,9 L23,6 23,18 18,15 Z" /><TextBlock Text="{Binding CameraActionLabel}" FontSize="11" HorizontalAlignment="Center" /></StackPanel></Button>
-        <Button Classes="media-control" Classes.active="{Binding ScreenEnabled}" Command="{Binding ToggleScreenCommand}" AutomationProperties.Name="Toggle screen sharing"><StackPanel Spacing="5" HorizontalAlignment="Center"><PathIcon Width="21" Height="20" Data="{StaticResource Glyph.Remote}" /><TextBlock Text="{Binding ScreenActionLabel}" FontSize="11" HorizontalAlignment="Center" /></StackPanel></Button>
-        <Button Classes="media-control danger" Command="{Binding LeaveCommand}" AutomationProperties.Name="Leave call"><StackPanel Spacing="5"><PathIcon Data="{StaticResource Glyph.Phone}" Width="20" Height="20" HorizontalAlignment="Center" /><TextBlock Text="Leave call" FontSize="11" HorizontalAlignment="Center" /></StackPanel></Button>
+        <Button Classes="media-control" Classes.off="{Binding !MicrophoneEnabled}" Command="{Binding ToggleMicrophoneCommand}" AutomationProperties.Name="{loc:Translate loc_542e869334d0}"><StackPanel Spacing="5" HorizontalAlignment="Center"><PathIcon Width="18" Height="20" Data="M9,2 L15,2 15,14 9,14 Z M5,10 L7,10 7,15 17,15 17,10 19,10 19,17 13,17 13,21 17,21 17,23 7,23 7,21 11,21 11,17 5,17 Z" /><TextBlock Text="{Binding MicrophoneActionLabel}" FontSize="11" HorizontalAlignment="Center" /></StackPanel></Button>
+        <Button Classes="media-control" Classes.off="{Binding !CameraEnabled}" Command="{Binding ToggleCameraCommand}" AutomationProperties.Name="{loc:Translate loc_b50eae6645b0}"><StackPanel Spacing="5" HorizontalAlignment="Center"><PathIcon Width="21" Height="20" Data="M2,5 L16,5 16,19 2,19 Z M18,9 L23,6 23,18 18,15 Z" /><TextBlock Text="{Binding CameraActionLabel}" FontSize="11" HorizontalAlignment="Center" /></StackPanel></Button>
+        <Button Classes="media-control" Classes.active="{Binding ScreenEnabled}" Command="{Binding ToggleScreenCommand}" AutomationProperties.Name="{loc:Translate loc_2785debbca29}"><StackPanel Spacing="5" HorizontalAlignment="Center"><PathIcon Width="21" Height="20" Data="{StaticResource Glyph.Remote}" /><TextBlock Text="{Binding ScreenActionLabel}" FontSize="11" HorizontalAlignment="Center" /></StackPanel></Button>
+        <Button Classes="media-control danger" Command="{Binding LeaveCommand}" AutomationProperties.Name="{loc:Translate loc_06eb7d6c9ca6}"><StackPanel Spacing="5"><PathIcon Data="{StaticResource Glyph.Phone}" Width="20" Height="20" HorizontalAlignment="Center" /><TextBlock Text="{loc:Translate loc_06eb7d6c9ca6}" FontSize="11" HorizontalAlignment="Center" /></StackPanel></Button>
       </StackPanel>
     </Border>
   </Grid>

@@ -37,7 +37,7 @@ internal sealed class WorkspaceFormWindow : Window
         if(editor is ScrollViewer {Content:Control body}) {body.MaxWidth=1400;body.HorizontalAlignment=HorizontalAlignment.Stretch;body.VerticalAlignment=VerticalAlignment.Top;}
         var feedbackText = new TextBlock { TextWrapping = TextWrapping.Wrap }; feedbackText.Bind(TextBlock.TextProperty, new Binding(nameof(model.Feedback)));
         var errors = new Dictionary<string,(Control Input,TextBlock Message,StackPanel Parent)>();
-        var goToField = new Button { Content = "Go to field", HorizontalAlignment = HorizontalAlignment.Left, IsVisible = false };
+        var goToField = new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Go to field"), HorizontalAlignment = HorizontalAlignment.Left, IsVisible = false };
         goToField.Click += (_, _) =>
         {
             if (model.FormValidationIssue is {} issue && errors.TryGetValue(issue.Field,out var field))
@@ -50,8 +50,8 @@ internal sealed class WorkspaceFormWindow : Window
         var progress = new ProgressBar { IsIndeterminate = true, Height = 3 }; progress.Bind(IsVisibleProperty,new Binding(nameof(model.IsLoading)));
         var footerButtons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
         footerButtons.Bind(IsEnabledProperty, new Binding(nameof(model.IsLoading)) { Converter = BoolInverterConverter.Instance });
-        var cancel = new Button { Content = "Cancel", MinHeight = 40 }; cancel.Classes.Add("quiet"); cancel.Click += (_, _) => _ = CloseAnimatedAsync(); footerButtons.Children.Add(cancel);
-        if (kind == WorkspaceFormKind.Calendar) footerButtons.Children.Add(new Button { Content = "Review availability", MinHeight = 40, Command = model.ReviewEventCommand });
+        var cancel = new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Cancel"), MinHeight = 40 }; cancel.Classes.Add("quiet"); cancel.Click += (_, _) => _ = CloseAnimatedAsync(); footerButtons.Children.Add(cancel);
+        if (kind == WorkspaceFormKind.Calendar) footerButtons.Children.Add(new Button { [!Button.ContentProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("Review availability"), MinHeight = 40, Command = model.ReviewEventCommand });
         var submit = new Button { Name = "FormSubmit", MinHeight = 40, Content = kind switch { WorkspaceFormKind.Calendar => "Save schedule", WorkspaceFormKind.Vacation => "Review request", _ => "Publish announcement" }, Command = kind switch { WorkspaceFormKind.Calendar => model.SaveEventCommand, WorkspaceFormKind.Vacation => model.ReviewVacationRequestCommand, _ => model.PublishCommand } };
         submit.Classes.Add("fire-btn");
         if (kind == WorkspaceFormKind.Calendar) submit.Bind(IsEnabledProperty,new Binding(nameof(model.CanSaveCalendarForm)));

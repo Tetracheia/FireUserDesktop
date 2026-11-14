@@ -17,13 +17,19 @@ public partial class AppearanceSettingsViewModel : ObservableObject, IDisposable
     private bool applying, saving, disposed, editing;
     private long revision;
     public ClockDisplaySettings Clock => ClockDisplaySettings.Shared;
+    [ObservableProperty] private string locale = "en";
+    partial void OnLocaleChanged(string value)
+    {
+        UserIdentityDesktop.Core.Locale.LocaleCatalog.Set(value);
+        if(!applying)Queue(pending with { Locale=value });
+    }
     [ObservableProperty] private double brightness = 100;
     [ObservableProperty] private string status = "";
     public AppearanceSettingsViewModel(ICollaborationApi api)
     {
         this.api=api;
         brightness=Avalonia.Application.Current?.RequestedThemeVariant==ThemeVariant.Dark?0:100;
-        applying=true;Clock.TwelveHour=false;applying=false;
+        applying=true;Clock.TwelveHour=false;UserIdentityDesktop.Core.Locale.LocaleCatalog.Set("en");applying=false;
         Clock.PropertyChanged += ClockChanged;
         timer.Tick += OnTimer;
     }
@@ -54,7 +60,7 @@ public partial class AppearanceSettingsViewModel : ObservableObject, IDisposable
             var value=await api.AppearanceAsync(lifetime.Token);
             if(disposed||version!=revision||saving||editing||pending!=new AppearancePreferences()||value==null)return;
             applying=true;
-            try {if(value.TwelveHour is {} clock)Clock.TwelveHour=clock;if(value.Brightness is {} level)Brightness=level;}
+            try {Locale=UserIdentityDesktop.Core.Locale.LocaleCatalog.IsSupported(value.Locale)?value.Locale!:"en";if(value.TwelveHour is {} clock)Clock.TwelveHour=clock;if(value.Brightness is {} level)Brightness=level;}
             finally {applying=false;}
         }catch(OperationCanceledException) when(lifetime.IsCancellationRequested){}
         catch {if(!disposed&&version==revision)Status="Preferences could not be loaded.";}
@@ -65,7 +71,7 @@ public partial class AppearanceSettingsViewModel : ObservableObject, IDisposable
         var value=pending;pending=new();saving=true;
         try {await api.SaveAppearanceAsync(value,lifetime.Token);if(!disposed)Status="";}
         catch(OperationCanceledException) when(lifetime.IsCancellationRequested){return;}
-        catch {if(!disposed){pending=new(pending.TwelveHour??value.TwelveHour,pending.Brightness??value.Brightness);Status="Preferences could not be saved. Change the setting to retry.";}return;}
+        catch {if(!disposed){pending=new(pending.TwelveHour??value.TwelveHour,pending.Brightness??value.Brightness,pending.Locale??value.Locale);Status="Preferences could not be saved. Change the setting to retry.";}return;}
         finally {saving=false;}
         if(pending!=new AppearancePreferences())await FlushAsync();else await RefreshAsync();
     }

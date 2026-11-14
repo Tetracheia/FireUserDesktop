@@ -45,7 +45,7 @@ public sealed class ToastPresenter(Window owner, Func<bool>? reduceMotion = null
     {
         var body = new StackPanel { Spacing = 6, MaxWidth = 300, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(body, 1);
-        body.Children.Add(new TextBlock { Text = "FIRE USER", FontSize = 10, FontWeight = FontWeight.SemiBold });
+        body.Children.Add(new TextBlock { [!TextBlock.TextProperty] = UserIdentityDesktop.Localization.LocalizedStrings.Bind("FIRE USER"), FontSize = 10, FontWeight = FontWeight.SemiBold });
         body.Children.Add(new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap });
         body.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxLines = 3, TextTrimming = TextTrimming.CharacterEllipsis });
         return body;
